@@ -104,8 +104,9 @@
   does: `roundRadar`, `roundBlips`, `roundCrosshair`, `roundScope`. There are
   no master switches above them and no mode numbers, so there is exactly one
   key to change per fix and only one way to write "off".
-- Documented every key in the INI itself, including the two cases where one
-  setting depends on another.
+- Commented the INI only where the file cannot speak for itself: the
+  virtual-key codes, the units the radar layout is written in, and the two
+  places where one setting depends on another.
 - Added log notes for option combinations that cancel themselves out, such as
   `fixFov=1` with `useScreenAspect=0`, where the conversion scales by
   aspect / (4/3) and the aspect is held at 4:3, so it returns the angle

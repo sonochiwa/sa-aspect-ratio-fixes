@@ -47,53 +47,38 @@ its `scripts` directory. Press Alt+H after editing the INI.
 # Created by sonochiwa
 # Source code: https://github.com/sonochiwa/sa-aspect-ratio-fixes
 #
-# Every fix is its own switch: 1 turns it on, 0 leaves the game untouched.
-# Edit this file and press Alt+H in game to apply it without restarting.
+# Edit and press Alt+H in game to apply without restarting.
 
 [general]
-# Write AspectRatioFixes.log next to the plugin.
 log=0
-# Show a message in game after a successful reload.
 showNotifications=1
-# Reload hotkey, as decimal Win32 virtual-key codes. 18 is Alt and 72 is H.
-# Set hotkeyKey=0 to disable the hotkey entirely.
+# Decimal Win32 virtual-key codes. 18 is Alt, 72 is H. hotkeyKey=0 disables it.
 hotkeyModifier=18
 hotkeyKey=72
 
 [radar]
-# Draw the radar as a circle. The game draws an ellipse on every resolution.
 roundRadar=1
-# Draw the blip icons round. Independent of roundRadar.
 roundBlips=1
-# Radar size and position, in units of screen height, so they hold on any
-# resolution. Only used while roundRadar=1.
+# In units of screen height, so they hold on any resolution. Only used while
+# roundRadar=1.
 diameter=76
 marginLeft=40
 marginBottom=28
 
 [crosshair]
-# Give the weapon reticle and the rocket lock-on square proportions.
 roundCrosshair=1
-# Make the sniper scope circle and the camera viewfinder ring round, and fill
-# the bands the narrower scope opens beside itself. Needs roundCrosshair=1.
+# Needs roundCrosshair=1.
 roundScope=1
-# Hide the camera viewfinder, leaving the rest of the HUD alone.
 noCameraCrosshair=0
-# Hide the game HUD while aiming with the camera or the sniper rifle.
 hideCameraHud=0
 hideSniperHud=0
 
 [widescreen]
-# Render at the real aspect ratio of the screen instead of the game's fixed
-# 4:3 assumption.
 useScreenAspect=1
-# Widen the field of view to match, so a wider screen shows more rather than
-# cropping. Does nothing while useScreenAspect=0.
+# Does nothing while useScreenAspect=0.
 fixFov=1
 
 [worldSprites]
-# Correct the width of each kind of world sprite. Each is independent, so a
-# category that looks wrong in a particular mod can be turned off on its own.
 pickups=1
 coronas=1
 coronaReflections=1
@@ -108,8 +93,7 @@ cameraEffects=1
 targetingMeasurements=0
 
 [probe]
-# Diagnostic for development, not a fix. Corrects one candidate site at a time
-# so it can be identified in game; see the README.
+# Development diagnostic, not a fix. See the README.
 enabled=0
 group=0
 hotkeyModifier=18
@@ -117,10 +101,10 @@ hotkeyKey=80
 ```
 
 Every key is an independent on/off switch and takes effect on the next reload.
-Two of them depend on another being on, and the file says so where it matters:
-the radar layout is only used while `roundRadar=1`, and `fixFov` does nothing
-while `useScreenAspect=0` because the conversion scales by the screen aspect
-that setting provides. Both are also reported in the log when `log=1`.
+Only two depend on another being on, and both are commented in the file: the
+radar layout is used only while `roundRadar=1`, and `fixFov` does nothing while
+`useScreenAspect=0`, because the conversion scales by the screen aspect that
+setting provides. Both are reported in the log when `log=1`.
 
 ## Probing unmapped sites
 
