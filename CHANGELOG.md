@@ -20,8 +20,8 @@
   used by weapon target selection.
 
 - Added configurable INI hot reload. The default combination is `Alt+H`;
-  `general.hotkeyEnabled`, `general.hotkeyModifier` and `general.hotkeyKey`
-  use decimal Win32 virtual-key codes.
+  `general.hotkeyModifier` and `general.hotkeyKey` use decimal Win32
+  virtual-key codes, and `hotkeyKey=0` disables the hotkey.
 
 - Fixed `hideCameraHud` and `hideSniperHud` being bypassed when another plugin
   replaced the original `Render2dStuff` HUD call after startup. HUD visibility
@@ -62,8 +62,7 @@
   are configured in HUD units of screen height and keep the same proportions on
   every aspect ratio.
 - Added aspect correction for the weapon crosshair reticle and the rocket
-  launcher lock-on, with a choice between square proportions and the
-  proportions of a 4:3 display.
+  launcher lock-on, giving both square proportions.
 - Added `crosshair.roundScope`, which makes the sniper scope circle and the
   camera viewfinder ring round. The ring is drawn from a rectangle 256 units
   wide against 192 tall although its texture holds a round ring, so squaring
@@ -73,7 +72,7 @@
   two vertical bands of the scene show through beside the scope; set it to `0`
   to keep the vanilla scope.
 - Added a correction for the rocket launcher lock-on target, under
-  `crosshair.enabled`. `CWeaponEffects::Render` clamps the marker to a minimum
+  `roundCrosshair`. `CWeaponEffects::Render` clamps the marker to a minimum
   of 28 against 20 before drawing it, and at every distance it was measured at
   those clamps, not the projection, were what decided its shape. The two numbers
   are in different units: the width counts in `screenWidth / 640` and the height
@@ -101,6 +100,12 @@
   so an unmapped site can be identified in a running game before it is turned
   into a module. Two candidate groups are shipped, both in the CHud range.
   Off by default and corrects nothing on its own.
+- Every setting is a single on/off switch for one fix, named after what it
+  does: `roundRadar`, `roundBlips`, `roundCrosshair`, `roundScope`. There are
+  no master switches above them and no mode numbers, so there is exactly one
+  key to change per fix and only one way to write "off".
+- Documented every key in the INI itself, including the two cases where one
+  setting depends on another.
 - Added log notes for option combinations that cancel themselves out, such as
   `fixFov=1` with `useScreenAspect=0`, where the conversion scales by
   aspect / (4/3) and the aspect is held at 4:3, so it returns the angle

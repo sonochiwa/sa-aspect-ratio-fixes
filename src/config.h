@@ -4,37 +4,27 @@
 
 namespace config {
 
-// How the horizontal scale of the crosshair is rebuilt. The game stretches it
-// across the full width, so it gets wider as the display aspect ratio grows.
-enum class AspectMode {
-    Stretch = 0,     // Leave the game's own scaling alone.
-    Square = 1,      // One HUD unit covers the same number of pixels on both axes.
-    FourByThree = 2, // Reproduce the proportions of a 4:3 display.
-};
-
 struct Settings {
     bool log = false;
-    bool hotkeyEnabled = true;
+    bool showNotifications = true;
+    // A hotkeyKey of 0 disables the reload hotkey.
     int hotkeyModifier = VK_MENU;
     int hotkeyKey = 'H';
-    bool showNotifications = true;
 
-    bool radarEnabled = true;
-    bool radarRoundRadar = true;
-    bool radarRoundBlips = true;
+    bool roundRadar = true;
+    bool roundBlips = true;
     float radarDiameter = 76.0f;
     float radarMarginLeft = 40.0f;
     float radarMarginBottom = 28.0f;
 
-    bool crosshairEnabled = true;
-    AspectMode crosshairAspectMode = AspectMode::Square;
-    bool crosshairRoundScope = true;
+    bool roundCrosshair = true;
+    bool roundScope = true;
     bool noCameraCrosshair = false;
     bool hideCameraHud = false;
     bool hideSniperHud = false;
 
-    bool fixFov = true;
     bool useScreenAspect = true;
+    bool fixFov = true;
 
     bool spritePickups = true;
     bool spriteCoronas = true;

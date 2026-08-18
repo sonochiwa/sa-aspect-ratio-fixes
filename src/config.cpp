@@ -140,8 +140,8 @@ Settings Load(const char* path) {
     Settings settings;
 
     settings.log = ReadBool(path, "general", "log", false);
-    settings.hotkeyEnabled =
-        ReadBool(path, "general", "hotkeyEnabled", true);
+    settings.showNotifications =
+        ReadBool(path, "general", "showNotifications", true);
     settings.hotkeyModifier =
         ReadInt(path, "general", "hotkeyModifier", VK_MENU);
     if (settings.hotkeyModifier < 0 || settings.hotkeyModifier > 255)
@@ -152,12 +152,9 @@ Settings Load(const char* path) {
     settings.hotkeyKey = ReadInt(path, "general", "hotkeyKey", 0);
     if (settings.hotkeyKey < 0 || settings.hotkeyKey > 255)
         settings.hotkeyKey = 0;
-    settings.showNotifications =
-        ReadBool(path, "general", "showNotifications", true);
 
-    settings.radarEnabled = ReadBool(path, "radar", "enabled", true);
-    settings.radarRoundRadar = ReadBool(path, "radar", "roundRadar", true);
-    settings.radarRoundBlips = ReadBool(path, "radar", "roundBlips", true);
+    settings.roundRadar = ReadBool(path, "radar", "roundRadar", true);
+    settings.roundBlips = ReadBool(path, "radar", "roundBlips", true);
     settings.radarDiameter =
         ReadFloat(path, "radar", "diameter", 76.0f, 8.0f, 448.0f);
     settings.radarMarginLeft =
@@ -165,16 +162,9 @@ Settings Load(const char* path) {
     settings.radarMarginBottom =
         ReadFloat(path, "radar", "marginBottom", 28.0f, 0.0f, 400.0f);
 
-    settings.crosshairEnabled = ReadBool(path, "crosshair", "enabled", true);
-
-    switch (ReadInt(path, "crosshair", "aspectMode", 1)) {
-        case 0: settings.crosshairAspectMode = AspectMode::Stretch; break;
-        case 2: settings.crosshairAspectMode = AspectMode::FourByThree; break;
-        default: settings.crosshairAspectMode = AspectMode::Square; break;
-    }
-
-    settings.crosshairRoundScope =
-        ReadBool(path, "crosshair", "roundScope", true);
+    settings.roundCrosshair =
+        ReadBool(path, "crosshair", "roundCrosshair", true);
+    settings.roundScope = ReadBool(path, "crosshair", "roundScope", true);
     settings.noCameraCrosshair =
         ReadBool(path, "crosshair", "noCameraCrosshair", false);
     settings.hideCameraHud =
@@ -182,10 +172,9 @@ Settings Load(const char* path) {
     settings.hideSniperHud =
         ReadBool(path, "crosshair", "hideSniperHud", false);
 
-    settings.fixFov = ReadBool(path, "widescreen", "fixFov", true);
     settings.useScreenAspect =
         ReadBool(path, "widescreen", "useScreenAspect", true);
-
+    settings.fixFov = ReadBool(path, "widescreen", "fixFov", true);
     settings.spritePickups =
         ReadBool(path, "worldSprites", "pickups", true);
     settings.spriteCoronas =

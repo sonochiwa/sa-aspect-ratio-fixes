@@ -406,36 +406,20 @@ void LogSettingConflicts() {
                        "returns the angle unchanged");
     }
 
-    if (!g_settings.radarEnabled &&
-        (g_settings.radarRoundRadar || g_settings.radarRoundBlips)) {
-        logging::Write("  note: roundRadar and roundBlips have no effect "
-                       "while radar enabled=0");
-    }
-
-    if (g_settings.radarEnabled && !g_settings.radarRoundRadar &&
+    if (!g_settings.roundRadar &&
         (g_settings.radarDiameter != kStockRadarHigh ||
          g_settings.radarMarginLeft != kStockRadarLeft ||
-         g_settings.radarMarginBottom !=
-             kStockRadarTop - kStockRadarHigh)) {
+         g_settings.radarMarginBottom != kStockRadarTop - kStockRadarHigh)) {
         logging::Write("  note: diameter and margins are ignored while "
                        "roundRadar=0. They are HUD units of screen height, "
                        "which only describe the radar once its axes share one "
                        "scale");
     }
 
-    const bool stretchedCrosshair =
-        g_settings.crosshairAspectMode == config::AspectMode::Stretch;
-    if (g_settings.crosshairEnabled && stretchedCrosshair) {
-        logging::Write("  note: aspectMode=0 keeps the game's own scaling, so "
-                       "crosshair enabled=1 corrects nothing");
-    }
-
-    if (g_settings.crosshairRoundScope &&
-        (!g_settings.crosshairEnabled || stretchedCrosshair)) {
-        logging::Write("  note: roundScope has no effect while crosshair "
-                       "enabled=0 or aspectMode=0");
-    }
-}
+    if (g_settings.roundScope && !g_settings.roundCrosshair) {
+        logging::Write("  note: roundScope has no effect while "
+                       "roundCrosshair=0");
+    }}
 
 // Recomputes every plugin owned value for the current resolution. This runs on
 // every resolution change, so the geometry is correct in windowed mode, after a
@@ -464,10 +448,7 @@ void UpdateGeometry(const Resolution& resolution) {
     // Patched operands keep pointing at our variables after a hot reload.
     // Restoring their stock values disables a group without rewriting
     // executable code from the polling thread.
-    const bool correctRadar =
-        g_settings.radarEnabled && g_settings.radarRoundRadar;
-
-    if (correctRadar) {
+    if (g_settings.roundRadar) {
         // SCREEN_STRETCH_X(a) evaluates to a * screenWidth * factor. Making
         // that a * screenHeight / 448 gives the radar one scale on both axes.
         g_radarStretchX = squareStretch;
@@ -487,45 +468,23 @@ void UpdateGeometry(const Resolution& resolution) {
         g_radarTop = kStockRadarTop;
     }
 
-    g_blipStretchX =
-        (g_settings.radarEnabled && g_settings.radarRoundBlips)
-            ? squareStretch
-            : kStockStretchX;
+    g_blipStretchX = g_settings.roundBlips ? squareStretch : kStockStretchX;
 
-    float selectedCrosshairStretch = kStockStretchX;
-    if (g_settings.crosshairEnabled) {
-        switch (g_settings.crosshairAspectMode) {
-            case config::AspectMode::Square:
-                selectedCrosshairStretch = squareStretch;
-                break;
-            case config::AspectMode::FourByThree:
-                // What a 4:3 display would show: there screenWidth / 640
-                // equals screenHeight / 480.
-                selectedCrosshairStretch =
-                    screenHeight / (480.0f * screenWidth);
-                break;
-            case config::AspectMode::Stretch:
-            default:
-                break;
-        }
-    }
-    g_crosshairStretchX = selectedCrosshairStretch;
+    g_crosshairStretchX =
+        g_settings.roundCrosshair ? squareStretch : kStockStretchX;
 
+    // The scope is part of the crosshair: correcting it while the reticle
+    // keeps the game's own scaling would leave the two disagreeing.
     const bool correctScope =
-        g_settings.crosshairEnabled && g_settings.crosshairRoundScope &&
-        g_settings.crosshairAspectMode != config::AspectMode::Stretch;
-    g_scopeStretchX = correctScope ? selectedCrosshairStretch : kStockStretchX;
-    g_viewfinderWidth =
-        correctScope ? game::kViewfinderHeight : 256.0f;
+        g_settings.roundCrosshair && g_settings.roundScope;
+    g_scopeStretchX = correctScope ? squareStretch : kStockStretchX;
+    g_viewfinderWidth = correctScope ? game::kViewfinderHeight : 256.0f;
 
     // One unit of the lock-on marker's width covers screenWidth / 640 pixels
     // while one unit of its height covers screenHeight / 448, so the minimum
     // width has to be divided by the ratio of the two to clamp both axes to the
     // same number of pixels.
-    const bool correctCrosshair =
-        g_settings.crosshairEnabled &&
-        g_settings.crosshairAspectMode != config::AspectMode::Stretch;
-    g_lockOnMinWidth = correctCrosshair
+    g_lockOnMinWidth = g_settings.roundCrosshair
         ? kLockOnMinHeight * (game::kDesignWidth * screenHeight) /
               (game::kDesignHeight * screenWidth)
         : 28.0f;
@@ -982,7 +941,7 @@ void ApplyRadar() {
                           game::kRadarHigh, &g_radarHigh);
 
     g_radarPatched = applied;
-    if (applied && g_settings.radarEnabled && g_settings.radarRoundRadar)
+    if (applied && g_settings.roundRadar)
         RestoreRadarMask();
 }
 
@@ -1013,8 +972,7 @@ void ApplyCrosshair() {
 
 void PublishRenderSettings() {
     const bool correctScope =
-        g_settings.crosshairEnabled && g_settings.crosshairRoundScope &&
-        g_settings.crosshairAspectMode != config::AspectMode::Stretch;
+        g_settings.roundCrosshair && g_settings.roundScope;
 
     InterlockedExchange(&g_noCameraCrosshair,
                         g_settings.noCameraCrosshair ? 1 : 0);
@@ -1059,10 +1017,7 @@ void ApplyReloadedSettings(HMODULE module, const char* path,
     // All operands are attached to plugin-owned variables during startup,
     // including disabled modules. Reloading therefore changes only aligned
     // data values and never rewrites executable instructions mid-frame.
-    const bool wasCorrectingRadar =
-        previous.radarEnabled && previous.radarRoundRadar;
-    if (g_settings.radarEnabled && g_settings.radarRoundRadar &&
-        !wasCorrectingRadar)
+    if (g_settings.roundRadar && !previous.roundRadar)
         RestoreRadarMask();
 
     PublishRenderSettings();
@@ -1104,7 +1059,7 @@ void ServiceProbeHotkey(bool& wasDown) {
 
 void ServiceReloadHotkey(HMODULE module, const char* path,
                          const Resolution& resolution, bool& wasDown) {
-    if (!g_settings.hotkeyEnabled || g_settings.hotkeyKey == 0) {
+    if (g_settings.hotkeyKey == 0) {
         wasDown = false;
         return;
     }
