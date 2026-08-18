@@ -1,0 +1,3 @@
+#include "resource.h"
+
+IDR_DEFAULT_INI RCDATA "..\\Config\\AspectRatioFixes.ini"

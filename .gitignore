@@ -1,0 +1,9 @@
+*.log
+.vs/
+*.user
+
+build/
+dist/
+references/
+
+.claude/settings.local.json

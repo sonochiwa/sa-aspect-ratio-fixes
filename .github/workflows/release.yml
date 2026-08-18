@@ -1,0 +1,146 @@
+name: Verified release
+
+on:
+  push:
+    tags:
+      - "v*"
+      - "[0-9]*"
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: windows-2022
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v6
+
+      - name: Configure MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build Release Win32
+        run: msbuild AspectRatioFixes.sln /t:Rebuild /p:Configuration=Release /p:Platform=Win32
+
+      - name: Package release
+        id: package
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+              throw "Release tag must contain a semantic version."
+          }
+
+          $iniHeader = (Get-Content Config\AspectRatioFixes.ini -TotalCount 1)
+          if ($iniHeader -ne "# SA Aspect Ratio Fixes v$version") {
+              throw "Config\AspectRatioFixes.ini declares '$iniHeader', not version $version."
+          }
+
+          $source = Get-Content src\AspectRatioFixes.cpp -Raw
+          $sourceVersion = [regex]::Match($source, 'kVersion\[\]\s*=\s*"(?<v>[^"]+)"')
+          if (-not $sourceVersion.Success) {
+              throw "src\AspectRatioFixes.cpp has no kVersion definition."
+          }
+          if ($sourceVersion.Groups['v'].Value -ne $version) {
+              throw "src\AspectRatioFixes.cpp declares version '$($sourceVersion.Groups['v'].Value)', not $version."
+          }
+
+          $archiveName = "AspectRatioFixes-v$version.zip"
+          $archive = Join-Path build $archiveName
+          $checksum = "$archive.sha256"
+          $stage = Join-Path build "release\AspectRatioFixes-v$version"
+          Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $stage -Force | Out-Null
+          Copy-Item build\AspectRatioFixes.asi, build\AspectRatioFixes.ini -Destination $stage
+
+          $extras = Join-Path $stage "optional"
+          New-Item -ItemType Directory -Path $extras -Force | Out-Null
+          Copy-Item extras\cameraCrosshair.png -Destination $extras
+          Copy-Item extras\README.md -Destination (Join-Path $extras README.txt)
+
+          $readme = @(
+              "SA Aspect Ratio Fixes v$version"
+              "Created by sonochiwa"
+              ""
+              "A modular aspect-ratio correction suite for GTA San Andreas. It"
+              "corrects HUD geometry, aiming overlays, gameplay FOV and selected"
+              "world sprites without applying a single global scale to unrelated"
+              "effects."
+              ""
+              "Installation"
+              ""
+              "  1. Extract AspectRatioFixes.asi and AspectRatioFixes.ini into the"
+              "     GTA San Andreas directory or into its scripts directory."
+              "  2. Start the game."
+              ""
+              "Requires GTA San Andreas 1.0 US (or a SA-MP installation based on it)"
+              "and an ASI loader. Any other executable version is left untouched."
+              ""
+              "The optional directory holds a replacement camera viewfinder"
+              "texture. It is cosmetic and is not required; its own README"
+              "explains how to install it."
+              ""
+              "Every setting is documented in AspectRatioFixes.ini and in the"
+              "repository README. Set log=1 to have the plugin record the geometry"
+              "it computed and the result of every patch group in"
+              "AspectRatioFixes.log."
+              ""
+              "Source code: https://github.com/sonochiwa/sa-aspect-ratio-fixes"
+          ) -join [Environment]::NewLine
+          [IO.File]::WriteAllText(
+              (Join-Path $stage README.txt),
+              $readme,
+              [Text.UTF8Encoding]::new($false)
+          )
+
+          Compress-Archive -Path "$stage\*" -DestinationPath $archive -Force
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
+          "$hash  $archiveName" | Set-Content -LiteralPath $checksum -Encoding ascii
+
+          $changelog = Get-Content CHANGELOG.md -Raw
+          $pattern = "(?ms)^##[ \t]+v?$([regex]::Escape($version))(?:[ \t]+-[^\r\n]+)?[ \t]*\r?\n(?<body>.*?)(?=^##\s|\z)"
+          $match = [regex]::Match($changelog, $pattern)
+          if (-not $match.Success) {
+              throw "CHANGELOG.md has no section for $version."
+          }
+          $notes = @(
+              $match.Groups['body'].Value.Trim()
+              ""
+              "### Verifying the download"
+              ""
+              "The archive was built by GitHub Actions from tag ``${{ github.ref_name }}``. Compare it with the published SHA-256 file or verify its signed build provenance:"
+              ""
+              '```text'
+              "gh attestation verify $archiveName -R $env:GITHUB_REPOSITORY"
+              '```'
+          ) -join [Environment]::NewLine
+          [IO.File]::WriteAllText(
+              (Join-Path build release-notes.md),
+              $notes,
+              [Text.UTF8Encoding]::new($false)
+          )
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "archive=$archive" >> $env:GITHUB_OUTPUT
+          "checksum=$checksum" >> $env:GITHUB_OUTPUT
+
+      - name: Attest release archive
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ steps.package.outputs.archive }}
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" `
+            "${{ steps.package.outputs.archive }}" `
+            "${{ steps.package.outputs.checksum }}" `
+            --verify-tag `
+            --latest `
+            --title "SA Aspect Ratio Fixes v${{ steps.package.outputs.version }}" `
+            --notes-file build\release-notes.md
