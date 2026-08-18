@@ -20,8 +20,10 @@
   used by weapon target selection.
 
 - Added configurable INI hot reload. The default combination is `Alt+H`;
-  `general.hotkeyModifier` and `general.hotkeyKey` use decimal Win32
-  virtual-key codes, and `hotkeyKey=0` disables the hotkey.
+  `general.reloadHotkey` is written the way it is spoken, `Alt+H`, taking an
+  optional Alt, Ctrl or Shift and a letter, digit or function key. `none`
+  disables it, and an unreadable value keeps the default rather than silently
+  unbinding the key.
 
 - Fixed `hideCameraHud` and `hideSniperHud` being bypassed when another plugin
   replaced the original `Render2dStuff` HUD call after startup. HUD visibility
@@ -105,9 +107,12 @@
   does: `roundRadar`, `roundBlips`, `roundCrosshair`, `roundScope`. There are
   no master switches above them and no mode numbers, so there is exactly one
   key to change per fix and only one way to write "off".
-- Commented the INI only where the file cannot speak for itself: the
-  virtual-key codes, the units the radar layout is written in, and the two
-  places where one setting depends on another.
+- Named the keys so the file needs almost no commentary: `showReloadMessage`
+  says what it shows, `reloadHotkey` carries `Alt+H` rather than two
+  virtual-key codes, and `roundScope` no longer depends on `roundCrosshair`,
+  since the scope replaces the reticle rather than sharing the screen with it.
+  Three comments remain, for the units the radar layout is written in, the one
+  dependency left, and the experimental sprite option.
 - Added log notes for option combinations that cancel themselves out, such as
   `fixFov=1` with `useScreenAspect=0`, where the conversion scales by
   aspect / (4/3) and the aspect is held at 4:3, so it returns the angle

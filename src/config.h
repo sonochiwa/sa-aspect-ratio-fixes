@@ -4,12 +4,17 @@
 
 namespace config {
 
+// A key with an optional modifier, both as Win32 virtual-key codes. A key of
+// 0 means the hotkey is disabled.
+struct Hotkey {
+    int modifier;
+    int key;
+};
+
 struct Settings {
     bool log = false;
-    bool showNotifications = true;
-    // A hotkeyKey of 0 disables the reload hotkey.
-    int hotkeyModifier = VK_MENU;
-    int hotkeyKey = 'H';
+    bool showReloadMessage = true;
+    Hotkey reloadHotkey = {VK_MENU, 'H'};
 
     bool roundRadar = true;
     bool roundBlips = true;
@@ -42,8 +47,7 @@ struct Settings {
     // can be identified in game; see references\stretch-x-sites.md.
     bool probeEnabled = false;
     int probeGroup = 0;
-    int probeHotkeyModifier = VK_MENU;
-    int probeHotkeyKey = 'P';
+    Hotkey probeHotkey = {VK_MENU, 'P'};
 };
 
 // Builds "<module directory>\<module name>.ini". Returns false when the path

@@ -49,6 +49,108 @@ bool ParseFloat(const char* text, float& value) {
     return true;
 }
 
+// Hotkeys are written the way a person says them, "Alt+H", so the file does
+// not have to explain that 18 is Alt and 72 is H. A value naming no key
+// disables the hotkey.
+bool EqualsNoCase(const char* text, size_t length, const char* word) {
+    for (size_t i = 0; i < length; ++i) {
+        char left = text[i];
+        if (left >= 'a' && left <= 'z')
+            left = static_cast<char>(left - 'a' + 'A');
+        char right = word[i];
+        if (right == '\0')
+            return false;
+        if (right >= 'a' && right <= 'z')
+            right = static_cast<char>(right - 'a' + 'A');
+        if (left != right)
+            return false;
+    }
+    return word[length] == '\0';
+}
+
+// One token of a hotkey: a modifier name, a letter or digit, or Fn.
+bool ParseHotkeyToken(const char* token, size_t length, Hotkey& hotkey) {
+    if (length == 0)
+        return true;
+
+    if (EqualsNoCase(token, length, "alt")) {
+        hotkey.modifier = VK_MENU;
+        return true;
+    }
+    if (EqualsNoCase(token, length, "ctrl") ||
+        EqualsNoCase(token, length, "control")) {
+        hotkey.modifier = VK_CONTROL;
+        return true;
+    }
+    if (EqualsNoCase(token, length, "shift")) {
+        hotkey.modifier = VK_SHIFT;
+        return true;
+    }
+    if (EqualsNoCase(token, length, "none"))
+        return true;
+
+    if (length == 1) {
+        const char c = token[0];
+        if (c >= 'a' && c <= 'z') {
+            hotkey.key = c - 'a' + 'A';
+            return true;
+        }
+        if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) {
+            hotkey.key = c;
+            return true;
+        }
+        return false;
+    }
+
+    if ((token[0] == 'f' || token[0] == 'F') && length <= 3) {
+        int number = 0;
+        for (size_t i = 1; i < length; ++i) {
+            if (token[i] < '0' || token[i] > '9')
+                return false;
+            number = number * 10 + (token[i] - '0');
+        }
+        if (number >= 1 && number <= 12) {
+            hotkey.key = VK_F1 + number - 1;
+            return true;
+        }
+    }
+    return false;
+}
+
+Hotkey ParseHotkey(const char* text, const Hotkey& fallback) {
+    Hotkey parsed = {0, 0};
+    const char* cursor = text;
+    const char* tokenStart = cursor;
+    bool valid = true;
+
+    for (;; ++cursor) {
+        if (*cursor == '+' || *cursor == '\0') {
+            const char* tokenEnd = cursor;
+            while (tokenStart < tokenEnd &&
+                   (*tokenStart == ' ' || *tokenStart == '\t'))
+                ++tokenStart;
+            while (tokenEnd > tokenStart &&
+                   (tokenEnd[-1] == ' ' || tokenEnd[-1] == '\t'))
+                --tokenEnd;
+
+            if (!ParseHotkeyToken(tokenStart,
+                                  static_cast<size_t>(tokenEnd - tokenStart),
+                                  parsed)) {
+                valid = false;
+            }
+            if (*cursor == '\0')
+                break;
+            tokenStart = cursor + 1;
+        }
+    }
+
+    // A value the plugin cannot read is a typo, not a request to change the
+    // binding, so the default is kept rather than silently disabling it.
+    if (!valid)
+        return fallback;
+    return parsed;
+}
+
 bool ReadRaw(const char* path, const char* section, const char* key,
              char (&value)[64]) {
     GetPrivateProfileStringA(section, key, "", value,
@@ -140,19 +242,15 @@ Settings Load(const char* path) {
     Settings settings;
 
     settings.log = ReadBool(path, "general", "log", false);
-    settings.showNotifications =
-        ReadBool(path, "general", "showNotifications", true);
-    settings.hotkeyModifier =
-        ReadInt(path, "general", "hotkeyModifier", VK_MENU);
-    if (settings.hotkeyModifier < 0 || settings.hotkeyModifier > 255)
-        settings.hotkeyModifier = VK_MENU;
-    // A missing key deliberately disables hotkey handling. Do not replace
-    // this fallback with the compiled default: users may remove the key to
-    // opt out without changing any other setting.
-    settings.hotkeyKey = ReadInt(path, "general", "hotkeyKey", 0);
-    if (settings.hotkeyKey < 0 || settings.hotkeyKey > 255)
-        settings.hotkeyKey = 0;
+    settings.showReloadMessage =
+        ReadBool(path, "general", "showReloadMessage", true);
 
+    char hotkey[64] = {};
+    const Hotkey reloadFallback = {VK_MENU, 'H'};
+    settings.reloadHotkey =
+        ReadRaw(path, "general", "reloadHotkey", hotkey)
+            ? ParseHotkey(hotkey, reloadFallback)
+            : reloadFallback;
     settings.roundRadar = ReadBool(path, "radar", "roundRadar", true);
     settings.roundBlips = ReadBool(path, "radar", "roundBlips", true);
     settings.radarDiameter =
@@ -202,13 +300,11 @@ Settings Load(const char* path) {
     settings.probeGroup = ReadInt(path, "probe", "group", 0);
     if (settings.probeGroup < 0 || settings.probeGroup > 1)
         settings.probeGroup = 0;
-    settings.probeHotkeyModifier =
-        ReadInt(path, "probe", "hotkeyModifier", VK_MENU);
-    if (settings.probeHotkeyModifier < 0 || settings.probeHotkeyModifier > 255)
-        settings.probeHotkeyModifier = VK_MENU;
-    settings.probeHotkeyKey = ReadInt(path, "probe", "hotkeyKey", 'P');
-    if (settings.probeHotkeyKey < 0 || settings.probeHotkeyKey > 255)
-        settings.probeHotkeyKey = 0;
+    char probeKey[64] = {};
+    const Hotkey probeFallback = {VK_MENU, 'P'};
+    settings.probeHotkey = ReadRaw(path, "probe", "hotkey", probeKey)
+                               ? ParseHotkey(probeKey, probeFallback)
+                               : probeFallback;
     return settings;
 }
 

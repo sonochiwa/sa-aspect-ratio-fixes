@@ -22,7 +22,7 @@ If another ASI already owns a hook, the conflicting group is skipped.
   point lights, birds, clouds, checkpoints and weapon/camera effects.
 - Experimental targeting-measurement correction, disabled by default because
   it can affect target selection rather than visuals alone.
-- Runtime INI reload with configurable hotkey; default is Alt+H.
+- Runtime INI reload on a hotkey written as `Alt+H`; default is Alt+H.
 - One on/off key per fix, with the two real dependencies named in the file and
   in the log.
 
@@ -46,28 +46,22 @@ its `scripts` directory. Press Alt+H after editing the INI.
 # SA Aspect Ratio Fixes v1.0.0
 # Created by sonochiwa
 # Source code: https://github.com/sonochiwa/sa-aspect-ratio-fixes
-#
-# Edit and press Alt+H in game to apply without restarting.
 
 [general]
 log=0
-showNotifications=1
-# Decimal Win32 virtual-key codes. 18 is Alt, 72 is H. hotkeyKey=0 disables it.
-hotkeyModifier=18
-hotkeyKey=72
+showReloadMessage=1
+reloadHotkey=Alt+H
 
 [radar]
 roundRadar=1
 roundBlips=1
-# In units of screen height, so they hold on any resolution. Only used while
-# roundRadar=1.
+# Only while roundRadar=1. Units of screen height, not pixels.
 diameter=76
 marginLeft=40
 marginBottom=28
 
 [crosshair]
 roundCrosshair=1
-# Needs roundCrosshair=1.
 roundScope=1
 noCameraCrosshair=0
 hideCameraHud=0
@@ -94,10 +88,15 @@ targetingMeasurements=0
 ```
 
 Every key is an independent on/off switch and takes effect on the next reload.
-Only two depend on another being on, and both are commented in the file: the
-radar layout is used only while `roundRadar=1`, and `fixFov` does nothing while
+Two of them depend on another being on and say so in the file: the radar layout
+is used only while `roundRadar=1`, and `fixFov` does nothing while
 `useScreenAspect=0`, because the conversion scales by the screen aspect that
 setting provides. Both are reported in the log when `log=1`.
+
+`reloadHotkey` is written the way it is spoken: an optional `Alt`, `Ctrl` or
+`Shift`, then a letter, a digit or `F1` to `F12`. `none` disables it. A value
+the plugin cannot read is treated as a typo and leaves the default binding in
+place rather than silently unbinding the key.
 
 ## Probing unmapped sites
 
@@ -115,8 +114,7 @@ development tool and is deliberately absent from the shipped file:
 [probe]
 enabled=1
 group=0
-hotkeyModifier=18
-hotkeyKey=80
+hotkey=Alt+P
 ```
 
 Every site in the selected group is repointed at its own variable, and Alt+P

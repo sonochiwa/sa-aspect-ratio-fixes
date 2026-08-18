@@ -416,10 +416,7 @@ void LogSettingConflicts() {
                        "scale");
     }
 
-    if (g_settings.roundScope && !g_settings.roundCrosshair) {
-        logging::Write("  note: roundScope has no effect while "
-                       "roundCrosshair=0");
-    }}
+}
 
 // Recomputes every plugin owned value for the current resolution. This runs on
 // every resolution change, so the geometry is correct in windowed mode, after a
@@ -473,10 +470,9 @@ void UpdateGeometry(const Resolution& resolution) {
     g_crosshairStretchX =
         g_settings.roundCrosshair ? squareStretch : kStockStretchX;
 
-    // The scope is part of the crosshair: correcting it while the reticle
-    // keeps the game's own scaling would leave the two disagreeing.
-    const bool correctScope =
-        g_settings.roundCrosshair && g_settings.roundScope;
+    // The scope replaces the reticle rather than sharing the screen with it,
+    // so the two are corrected independently.
+    const bool correctScope = g_settings.roundScope;
     g_scopeStretchX = correctScope ? squareStretch : kStockStretchX;
     g_viewfinderWidth = correctScope ? game::kViewfinderHeight : 256.0f;
 
@@ -972,7 +968,7 @@ void ApplyCrosshair() {
 
 void PublishRenderSettings() {
     const bool correctScope =
-        g_settings.roundCrosshair && g_settings.roundScope;
+        g_settings.roundScope;
 
     InterlockedExchange(&g_noCameraCrosshair,
                         g_settings.noCameraCrosshair ? 1 : 0);
@@ -1024,7 +1020,7 @@ void ApplyReloadedSettings(HMODULE module, const char* path,
     UpdateProbeSelection();
     logging::Write("configuration reloaded");
 
-    if (g_settings.showNotifications)
+    if (g_settings.showReloadMessage)
         InterlockedExchange(&g_reloadNotificationPending, 1);
 
     if (!reloaded.log && previous.log)
@@ -1039,15 +1035,15 @@ bool IsVirtualKeyDown(int key) {
 // none again. Only plugin owned floats are written from here.
 void ServiceProbeHotkey(bool& wasDown) {
     if (!g_settings.probeEnabled || g_probeCount == 0 ||
-        g_settings.probeHotkeyKey == 0) {
+        g_settings.probeHotkey.key == 0) {
         wasDown = false;
         return;
     }
 
     const bool down =
-        IsVirtualKeyDown(g_settings.probeHotkeyKey) &&
-        (g_settings.probeHotkeyModifier == 0 ||
-         IsVirtualKeyDown(g_settings.probeHotkeyModifier));
+        IsVirtualKeyDown(g_settings.probeHotkey.key) &&
+        (g_settings.probeHotkey.modifier == 0 ||
+         IsVirtualKeyDown(g_settings.probeHotkey.modifier));
     if (down && !wasDown) {
         ++g_probeIndex;
         if (g_probeIndex > static_cast<int>(g_probeCount))
@@ -1059,15 +1055,15 @@ void ServiceProbeHotkey(bool& wasDown) {
 
 void ServiceReloadHotkey(HMODULE module, const char* path,
                          const Resolution& resolution, bool& wasDown) {
-    if (g_settings.hotkeyKey == 0) {
+    if (g_settings.reloadHotkey.key == 0) {
         wasDown = false;
         return;
     }
 
     const bool down =
-        IsVirtualKeyDown(g_settings.hotkeyKey) &&
-        (g_settings.hotkeyModifier == 0 ||
-         IsVirtualKeyDown(g_settings.hotkeyModifier));
+        IsVirtualKeyDown(g_settings.reloadHotkey.key) &&
+        (g_settings.reloadHotkey.modifier == 0 ||
+         IsVirtualKeyDown(g_settings.reloadHotkey.modifier));
     if (down && !wasDown)
         ApplyReloadedSettings(module, path, resolution);
     wasDown = down;
