@@ -99,7 +99,8 @@
   through them with a hotkey, naming the current site on screen and in the log,
   so an unmapped site can be identified in a running game before it is turned
   into a module. Two candidate groups are shipped, both in the CHud range.
-  Off by default and corrects nothing on its own.
+  The section is absent from the shipped INI and has to be added by hand;
+  without it the probe is off and corrects nothing.
 - Every setting is a single on/off switch for one fix, named after what it
   does: `roundRadar`, `roundBlips`, `roundCrosshair`, `roundScope`. There are
   no master switches above them and no mode numbers, so there is exactly one

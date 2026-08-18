@@ -91,13 +91,6 @@ weaponEffects=1
 cameraEffects=1
 # Experimental. Affects weapon target selection rather than visuals alone.
 targetingMeasurements=0
-
-[probe]
-# Development diagnostic, not a fix. See the README.
-enabled=0
-group=0
-hotkeyModifier=18
-hotkeyKey=80
 ```
 
 Every key is an independent on/off switch and takes effect on the next reload.
@@ -115,7 +108,8 @@ reads the `SCREEN_STRETCH_X` literal, grouped by the function containing it.
 A site cannot be classified from its encoding. Each of those functions mixes
 position conversions with size calculations, and correcting a position is what
 drifted the map blips, so a candidate group has to be watched in game before it
-becomes a module. The `[probe]` section does that:
+becomes a module. Adding a `[probe]` section to the INI does that. It is a
+development tool and is deliberately absent from the shipped file:
 
 ```ini
 [probe]
