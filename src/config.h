@@ -18,7 +18,7 @@ struct Settings {
 
     bool roundRadar = true;
     bool roundBlips = true;
-    float radarDiameter = 76.0f;
+    float radarDiameter = 86.0f;
     float radarMarginLeft = 40.0f;
     float radarMarginBottom = 28.0f;
 
@@ -28,7 +28,7 @@ struct Settings {
     bool hideCameraHud = false;
     bool hideSniperHud = false;
 
-    bool useScreenAspect = true;
+    bool useScreenAspect = false;
     bool fixFov = true;
 
     bool spritePickups = true;

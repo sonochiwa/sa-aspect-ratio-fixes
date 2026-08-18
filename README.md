@@ -56,7 +56,7 @@ reloadHotkey=Alt+H
 roundRadar=1
 roundBlips=1
 # Only while roundRadar=1. Units of screen height, not pixels.
-diameter=76
+diameter=86
 marginLeft=40
 marginBottom=28
 
@@ -68,7 +68,7 @@ hideCameraHud=0
 hideSniperHud=0
 
 [widescreen]
-useScreenAspect=1
+useScreenAspect=0
 # Does nothing while useScreenAspect=0.
 fixFov=1
 

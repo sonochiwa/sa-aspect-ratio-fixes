@@ -254,7 +254,7 @@ Settings Load(const char* path) {
     settings.roundRadar = ReadBool(path, "radar", "roundRadar", true);
     settings.roundBlips = ReadBool(path, "radar", "roundBlips", true);
     settings.radarDiameter =
-        ReadFloat(path, "radar", "diameter", 76.0f, 8.0f, 448.0f);
+        ReadFloat(path, "radar", "diameter", 86.0f, 8.0f, 448.0f);
     settings.radarMarginLeft =
         ReadFloat(path, "radar", "marginLeft", 40.0f, 0.0f, 400.0f);
     settings.radarMarginBottom =
@@ -271,7 +271,7 @@ Settings Load(const char* path) {
         ReadBool(path, "crosshair", "hideSniperHud", false);
 
     settings.useScreenAspect =
-        ReadBool(path, "widescreen", "useScreenAspect", true);
+        ReadBool(path, "widescreen", "useScreenAspect", false);
     settings.fixFov = ReadBool(path, "widescreen", "fixFov", true);
     settings.spritePickups =
         ReadBool(path, "worldSprites", "pickups", true);
