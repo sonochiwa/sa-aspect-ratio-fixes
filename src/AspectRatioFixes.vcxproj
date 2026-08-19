@@ -112,7 +112,6 @@
     <None Include="..\Config\AspectRatioFixes.ini" />
     <None Include="..\LICENSE" />
     <None Include="..\README.md" />
-    <None Include="..\ROADMAP.md" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
