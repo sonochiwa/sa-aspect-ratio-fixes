@@ -93,9 +93,10 @@
   skip prompt.
 - Added restoration of the circular radar mask when another modification has
   replaced the `CRadar::DrawRadarMask` prologue to force a square radar.
-- Added verification of all 77 patch sites before anything is written. The
-  radar is verified as a whole, so a partially applied geometry is impossible,
-  and an executable that is not 1.0 US is left untouched.
+- Added verification of every patch site before anything is written. The
+  radar's 59 operands are verified as one group, so a partially applied
+  geometry is impossible, and an executable that is not 1.0 US is left
+  untouched.
 - Added a `[probe]` diagnostic. It repoints a candidate group of
   SCREEN_STRETCH_X sites at one variable per site and steps the correction
   through them with a hotkey, naming the current site on screen and in the log,
