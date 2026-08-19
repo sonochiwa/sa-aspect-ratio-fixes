@@ -101,7 +101,19 @@ constexpr uint8_t kDrawCrossHairsPrologue[] = {
 constexpr uintptr_t kDrawHudBody = 0x0058FAED;
 constexpr uintptr_t kHudDisabled = 0x00A43088;
 constexpr uint8_t kDrawHudPrologue[] = {
-    0x80, 0x3D, 0x88, 0x30, 0xA4, 0x00, 0x01,
+    0x80, 0x3D, 0x88, 0x30, 0xA4, 0x00, 0x01, // cmp byte ptr ds:[A43088], 1
+};
+
+// SAMPFUNCS and other overlays take the prologue above for themselves, and
+// they reach the body through a trampoline of their own, so the body still
+// runs. Hooking it instead of the entry therefore coexists with them.
+//
+// The body opens with a five byte load from an absolute address, which is
+// exactly the width of a relative jump and needs no relocating, so the branch
+// replaces one whole instruction and nothing has to be padded.
+constexpr uintptr_t kDrawHudBodyResume = 0x0058FAF2;
+constexpr uint8_t kDrawHudBodyPrologue[] = {
+    0xA0, 0xC1, 0xA7, 0xC8, 0x00, // mov al, byte ptr ds:[C8A7C1]
 };
 
 // CCamera layout in 1.0 US. The active camera index is a byte and each CCam

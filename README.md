@@ -20,8 +20,8 @@ If another ASI already owns a hook, the conflicting group is skipped.
   `CDraw` path.
 - Selective width correction for pickups, coronas, reflections, sun/moon,
   point lights, birds, clouds, checkpoints and weapon/camera effects.
-- Experimental targeting-measurement correction, disabled by default because
-  it can affect target selection rather than visuals alone.
+- Experimental targeting-measurement correction, absent from the shipped INI
+  because it changes target selection rather than anything visible.
 - Runtime INI reload on a hotkey written as `Alt+H`; default is Alt+H.
 - One on/off key per fix, with the two real dependencies named in the file and
   in the log.
@@ -83,8 +83,6 @@ clouds=1
 checkpoints=1
 weaponEffects=1
 cameraEffects=1
-# Experimental. Affects weapon target selection rather than visuals alone.
-targetingMeasurements=0
 ```
 
 Every key is an independent on/off switch and takes effect on the next reload.
@@ -92,6 +90,12 @@ Two of them depend on another being on and say so in the file: the radar layout
 is used only while `roundRadar=1`, and `fixFov` does nothing while
 `useScreenAspect=0`, because the conversion scales by the screen aspect that
 setting provides. Both are reported in the log when `log=1`.
+
+`worldSprites.targetingMeasurements` is read but not shipped, like `[probe]`.
+It corrects the two calls where `CSprite::CalcScreenCoors` is used to measure
+rather than to draw, and their result decides which target a weapon locks on
+to, so it changes aim behaviour without changing a single pixel. Add the key by
+hand to experiment with it.
 
 `reloadHotkey` is written the way it is spoken: an optional `Alt`, `Ctrl` or
 `Shift`, then a letter, a digit or `F1` to `F12`. `none` disables it. A value

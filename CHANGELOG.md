@@ -16,8 +16,10 @@
 - Added independently reloadable world-sprite width corrections for pickups,
   coronas, reflections, sun/moon, point lights, birds, clouds, checkpoints,
   weapon effects and camera effects.
-- Added a disabled-by-default experimental correction for sprite measurements
-  used by weapon target selection.
+- Added an experimental correction for the sprite measurements weapon target
+  selection reads. It changes which target is picked without changing anything
+  on screen, so like `[probe]` its key is absent from the shipped INI and has
+  to be added by hand.
 
 - Added configurable INI hot reload. The default combination is `Alt+H`;
   `general.reloadHotkey` is written the way it is spoken, `Alt+H`, taking an
@@ -26,8 +28,15 @@
   unbinding the key.
 
 - Fixed `hideCameraHud` and `hideSniperHud` being bypassed when another plugin
-  replaced the original `Render2dStuff` HUD call after startup. HUD visibility
-  is now intercepted directly at the verified `CHud::Draw` entry.
+  owns `CHud::Draw`. The entry is used when it is free; when an overlay such as
+  SAMPFUNCS has taken it, that overlay reaches the body through a trampoline of
+  its own, so the body still runs and is hooked instead of fighting for the
+  entry.
+- Hooked `CHud::DrawCrossHairs` at its own entry rather than at the call to it
+  inside `CHud::Draw`. A HUD replacement that redirects `CHud::Draw` never runs
+  the original body, so a hook on that call site was written and never reached
+  while the replacement called `DrawCrossHairs` itself, leaving the sniper fill
+  undrawn.
 
 - Added `crosshair.noCameraCrosshair` to hide the camera viewfinder while
   leaving the rest of the game HUD unchanged.
