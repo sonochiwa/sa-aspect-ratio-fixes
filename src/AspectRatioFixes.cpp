@@ -262,7 +262,11 @@ void DrawSniperSideFill() {
         *reinterpret_cast<const int32_t*>(game::kScreenWidth));
     const float height = static_cast<float>(
         *reinterpret_cast<const int32_t*>(game::kScreenHeight));
-    const float halfScope = 210.0f * width * g_crosshairStretchX;
+    // The fill has to follow the scope's own factor, not the reticle's. They
+    // are equal while both corrections are on, but roundScope stands alone, so
+    // reading the reticle's here would size the fill for a scope that is not
+    // on screen.
+    const float halfScope = 210.0f * width * g_scopeStretchX;
     const float center = width * 0.5f;
     constexpr float kOutside = 5.0f;
     constexpr float kOverlap = 1.0f;
