@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.1.0
+
+- Fixed the fill that covers the bands beside a narrowed sniper scope not
+  being drawn under a HUD replacement. It hung on the call to
+  `CHud::DrawCrossHairs` inside `CHud::Draw`, and a plugin that redirects
+  `CHud::Draw` at its prologue never runs the original body, so the hook was
+  written and never reached while the replacement called `DrawCrossHairs`
+  itself. `CHud::DrawCrossHairs` is hooked at its own entry now, which every
+  caller goes through.
+- Fixed `hideCameraHud` and `hideSniperHud` doing nothing when another plugin
+  owns `CHud::Draw`. SAMPFUNCS takes its prologue for an overlay, and declining
+  was correct, but an overlay that hooks a prologue reaches the body through a
+  trampoline of its own, so the body still runs every frame. The entry is used
+  when it is free and the body when it is not. Which one applied is named in
+  the log.
+- Fixed the sniper fill reading the reticle's scale factor rather than the
+  scope's. The two are equal while both corrections are on, so this was only
+  reachable with `roundCrosshair=0` and `roundScope=1`, where the fill was
+  sized for a reticle that is not on screen.
+- Removed `worldSprites.targetingMeasurements` from the shipped INI. It is the
+  one key that changes how the game plays rather than how it looks, its effect
+  has never been measured, and it carried the last warning comment in the file.
+  It is still read, so it can be added by hand.
 ## 1.0.0
 
 - Kept full-screen map blips on their world coordinates while the map is
@@ -16,10 +39,8 @@
 - Added independently reloadable world-sprite width corrections for pickups,
   coronas, reflections, sun/moon, point lights, birds, clouds, checkpoints,
   weapon effects and camera effects.
-- Added an experimental correction for the sprite measurements weapon target
-  selection reads. It changes which target is picked without changing anything
-  on screen, so like `[probe]` its key is absent from the shipped INI and has
-  to be added by hand.
+- Added a disabled-by-default experimental correction for sprite measurements
+  used by weapon target selection.
 
 - Added configurable INI hot reload. The default combination is `Alt+H`;
   `general.reloadHotkey` is written the way it is spoken, `Alt+H`, taking an
@@ -28,15 +49,8 @@
   unbinding the key.
 
 - Fixed `hideCameraHud` and `hideSniperHud` being bypassed when another plugin
-  owns `CHud::Draw`. The entry is used when it is free; when an overlay such as
-  SAMPFUNCS has taken it, that overlay reaches the body through a trampoline of
-  its own, so the body still runs and is hooked instead of fighting for the
-  entry.
-- Hooked `CHud::DrawCrossHairs` at its own entry rather than at the call to it
-  inside `CHud::Draw`. A HUD replacement that redirects `CHud::Draw` never runs
-  the original body, so a hook on that call site was written and never reached
-  while the replacement called `DrawCrossHairs` itself, leaving the sniper fill
-  undrawn.
+  replaced the original `Render2dStuff` HUD call after startup. HUD visibility
+  is now intercepted directly at the verified `CHud::Draw` entry.
 
 - Added `crosshair.noCameraCrosshair` to hide the camera viewfinder while
   leaving the rest of the game HUD unchanged.

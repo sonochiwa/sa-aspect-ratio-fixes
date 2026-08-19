@@ -43,7 +43,7 @@ its `scripts` directory. Press Alt+H after editing the INI.
 ## Configuration
 
 ```ini
-# SA Aspect Ratio Fixes v1.0.0
+# SA Aspect Ratio Fixes v1.1.0
 # Created by sonochiwa
 # Source code: https://github.com/sonochiwa/sa-aspect-ratio-fixes
 

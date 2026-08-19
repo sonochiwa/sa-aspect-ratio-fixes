@@ -51,7 +51,7 @@
 
 namespace {
 
-constexpr char kVersion[] = "1.0.0";
+constexpr char kVersion[] = "1.1.0";
 
 // Stock values of the pooled literals the plugin repoints. They double as the
 // executable check: an executable that does not hold exactly these values at
