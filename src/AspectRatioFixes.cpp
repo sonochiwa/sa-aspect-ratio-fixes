@@ -102,6 +102,9 @@ size_t g_probeCount = 0;
 int g_probeIndex = -1;
 char g_probeMessage[96] = {};
 float g_squareStretch = kStockStretchX;
+
+// The copied prologue of CHud::DrawCrossHairs followed by a jump back into it.
+// Calling this runs the original function whoever hooked its entry.
 volatile LONG g_probeNotificationPending = 0;
 
 config::Settings g_settings;
@@ -156,6 +159,11 @@ struct Color {
 
 using DrawRectFn = int (__cdecl*)(const Rect&, const Color&);
 using DrawCrossHairsFn = void (__cdecl*)();
+
+// The copied prologue of CHud::DrawCrossHairs followed by a jump back into it.
+// Calling this runs the original function without going through its entry, so
+// it stays correct even though the entry now holds our branch.
+DrawCrossHairsFn g_drawCrossHairsOriginal = nullptr;
 using DrawHudFn = void (__cdecl*)();
 using AddMessageJumpFn = void (__cdecl*)(const char*, uint32_t, uint16_t, bool);
 
@@ -282,7 +290,7 @@ void DrawCrossHairsHook() {
         InterlockedCompareExchange(&g_noCameraCrosshair, 0, 0) != 0)
         return;
 
-    reinterpret_cast<DrawCrossHairsFn>(game::kDrawCrossHairs)();
+    g_drawCrossHairsOriginal();
 
     if (InterlockedCompareExchange(&g_drawSniperFill, 0, 0) != 0)
         DrawSniperSideFill();
@@ -813,22 +821,6 @@ void ApplyFovFix() {
     }
 }
 
-bool FindUniqueRelativeCall(uintptr_t start, size_t size, uintptr_t target,
-                            uintptr_t& callSite, size_t& matches) {
-    callSite = 0;
-    matches = 0;
-    if (!patch::IsReadable(start, size))
-        return false;
-
-    for (size_t offset = 0; offset + 5 <= size; ++offset) {
-        const uintptr_t site = start + offset;
-        if (!RelativeCallTargets(site, target))
-            continue;
-        callSite = site;
-        ++matches;
-    }
-    return matches == 1;
-}
 
 void ApplyAABugFix() {
     if (!patch::IsReadable(game::kRender2dStuffReturn, 5)) {
@@ -853,22 +845,65 @@ void ApplyAABugFix() {
                    applied ? "patched" : "FAILED");
 }
 
+// Hooks CHud::DrawCrossHairs at its own entry. The call to it inside
+// CHud::Draw is deliberately not used: a HUD replacement that redirects
+// CHud::Draw at its prologue never runs the original body, so a hook there is
+// written but never reached, while the replacement still calls DrawCrossHairs
+// itself. That is exactly the configuration that left the sniper fill missing.
 void ApplyCrosshairDrawHook() {
-    uintptr_t callSite = 0;
-    size_t matches = 0;
-    if (!FindUniqueRelativeCall(game::kDrawHud, game::kDrawHudSearchSize,
-                                game::kDrawCrossHairs, callSite, matches)) {
-        logging::Write("crosshair draw hook    SKIPPED, found %u calls",
-                       static_cast<unsigned>(matches));
+    constexpr size_t kStolen = sizeof(game::kDrawCrossHairsPrologue);
+
+    if (!patch::IsReadable(game::kDrawCrossHairs, kStolen) ||
+        std::memcmp(reinterpret_cast<const void*>(game::kDrawCrossHairs),
+                    game::kDrawCrossHairsPrologue, kStolen) != 0) {
+        logging::Write("crosshair draw hook    SKIPPED, unexpected prologue");
         return;
     }
 
-    const bool applied = WriteRelativeBranch(callSite, 0xE8,
-                                              reinterpret_cast<const void*>(
-                                                  DrawCrossHairsHook));
-    logging::Write("crosshair draw hook    %s", applied ? "patched" : "FAILED");
-}
+    // The trampoline holds the stolen instructions and a jump past them. Both
+    // are position independent, so copying them is enough; nothing needs to be
+    // rewritten for the new address.
+    auto* trampoline = static_cast<uint8_t*>(
+        VirtualAlloc(nullptr, kStolen + 5, MEM_COMMIT | MEM_RESERVE,
+                     PAGE_EXECUTE_READWRITE));
+    if (!trampoline) {
+        logging::Write("crosshair draw hook    FAILED, no executable memory");
+        return;
+    }
 
+    std::memcpy(trampoline, game::kDrawCrossHairsPrologue, kStolen);
+    trampoline[kStolen] = 0xE9;
+    const auto backwards = static_cast<int32_t>(
+        static_cast<intptr_t>(game::kDrawCrossHairsBody) -
+        reinterpret_cast<intptr_t>(trampoline + kStolen + 5));
+    std::memcpy(trampoline + kStolen + 1, &backwards, sizeof(backwards));
+
+    const intptr_t displacement =
+        reinterpret_cast<intptr_t>(DrawCrossHairsHook) -
+        static_cast<intptr_t>(game::kDrawCrossHairs + 5);
+    if (displacement < INT32_MIN || displacement > INT32_MAX) {
+        logging::Write("crosshair draw hook    FAILED, target out of range");
+        VirtualFree(trampoline, 0, MEM_RELEASE);
+        return;
+    }
+
+    // The trampoline has to be usable before the entry starts routing into the
+    // hook, otherwise a frame drawn in between calls through a null pointer.
+    g_drawCrossHairsOriginal = reinterpret_cast<DrawCrossHairsFn>(trampoline);
+
+    uint8_t branch[kStolen];
+    std::memset(branch, 0x90, sizeof(branch));
+    branch[0] = 0xE9;
+    const auto relative = static_cast<int32_t>(displacement);
+    std::memcpy(branch + 1, &relative, sizeof(relative));
+
+    const bool applied =
+        patch::WriteMemory(game::kDrawCrossHairs, branch, sizeof(branch));
+    if (!applied)
+        g_drawCrossHairsOriginal = nullptr;
+    logging::Write("crosshair draw hook    %s (CHud::DrawCrossHairs entry)",
+                   applied ? "patched" : "FAILED");
+}
 void ApplyHudVisibilityHook() {
     if (!patch::IsReadable(game::kDrawHud,
                            sizeof(game::kDrawHudPrologue)) ||

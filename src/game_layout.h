@@ -76,8 +76,22 @@ constexpr uintptr_t kSpriteTargetingSites[] = {0x0073E320, 0x0073E47B};
 // CHud::Draw calls DrawCrossHairs once near its start. The call itself is
 // located at runtime so the patch can verify both its opcode and destination.
 constexpr uintptr_t kDrawHud = 0x0058FAE0;
-constexpr size_t kDrawHudSearchSize = 0x500;
 constexpr uintptr_t kDrawCrossHairs = 0x0058E020;
+
+// CHud::DrawCrossHairs is hooked at its own entry rather than at the call to
+// it inside CHud::Draw. A HUD replacement that redirects CHud::Draw at its
+// prologue never runs the original body, so a hook on that call site is
+// installed but never reached, while the replacement still calls DrawCrossHairs
+// itself. Hooking the function catches it either way.
+//
+// The first two instructions are `sub esp, 30h` and a movzx from an absolute
+// address. Ten bytes, neither of them position dependent, so they can be
+// copied into a trampoline and re-executed from anywhere.
+constexpr uintptr_t kDrawCrossHairsBody = 0x0058E02A;
+constexpr uint8_t kDrawCrossHairsPrologue[] = {
+    0x83, 0xEC, 0x30,                                // sub  esp, 30h
+    0x0F, 0xB6, 0x05, 0x74, 0xCD, 0xB7, 0x00,        // movzx eax, byte ptr ds:[B7CD74]
+};
 
 // The first instruction in CHud::Draw is a seven-byte test of this frontend
 // flag. The HUD visibility hook replaces that complete instruction and enters
