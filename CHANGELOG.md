@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.1
+
+- Fixed the one-pixel AA edge frame inheriting RenderWare 2D state from the
+  weather/sky pass, which could tint the frame instead of drawing it black.
+
 ## 1.1.0
 
 - Fixed the fill that covers the bands beside a narrowed sniper scope not
