@@ -37,6 +37,9 @@ constexpr uintptr_t kRender2dStuffReturn = 0x0053E90E;
 // path as the HUD (a Direct3D EndScene/Present clear does not reach it).
 constexpr uintptr_t kDrawRect = 0x00727B60;
 
+// DefinedState2d resets RenderWare state for untextured 2D primitives.
+constexpr uintptr_t kDefinedState2d = 0x00734750;
+
 // CMessages::AddMessageJump(const char*, uint32, uint16, bool).
 constexpr uintptr_t kAddMessageJump = 0x0069F1E0;
 

@@ -155,6 +155,7 @@ struct Color {
 #pragma pack(pop)
 
 using DrawRectFn = int (__cdecl*)(const Rect&, const Color&);
+using DefinedState2dFn = void (__cdecl*)();
 using DrawCrossHairsFn = void (__cdecl*)();
 
 using DrawHudFn = void (__cdecl*)();
@@ -241,6 +242,10 @@ void __cdecl CalculateAspectRatioHook() {
 
 void DrawRect(const Rect& rect) {
     reinterpret_cast<DrawRectFn>(game::kDrawRect)(rect, kBlack);
+}
+
+void DefinedState2d() {
+    reinterpret_cast<DefinedState2dFn>(game::kDefinedState2d)();
 }
 
 int16_t GetCameraMode() {
@@ -372,6 +377,7 @@ void HideAABugHook() {
     const float height = static_cast<float>(
         *reinterpret_cast<const int32_t*>(game::kScreenHeight));
 
+    DefinedState2d();
     DrawRect({0.0f, -5.0f, width, 0.5f});
     DrawRect({-5.0f, -1.0f, 0.5f, height});
     DrawRect({0.0f, height - 1.5f, width, height + 5.0f});
