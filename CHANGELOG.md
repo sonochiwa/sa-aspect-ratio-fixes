@@ -4,6 +4,9 @@
 
 - Fixed the one-pixel AA edge frame inheriting RenderWare 2D state from the
   weather/sky pass, which could tint the frame instead of drawing it black.
+- Fixed that frame leaking its temporary RenderWare 2D state into the next
+  frame, which could make birds, skidmarks and other transparent world effects
+  render through geometry.
 
 ## 1.1.0
 

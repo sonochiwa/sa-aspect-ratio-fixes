@@ -158,6 +158,103 @@ using DrawRectFn = int (__cdecl*)(const Rect&, const Color&);
 using DefinedState2dFn = void (__cdecl*)();
 using DrawCrossHairsFn = void (__cdecl*)();
 
+using RenderStateSetFn = int (__cdecl*)(int, void*);
+using RenderStateGetFn = int (__cdecl*)(int, void*);
+
+// Prefixes of RenderWare 3.6's non-debug RwGlobals and RwDevice. Keeping the
+// declarations local avoids taking a dependency on the full RenderWare SDK.
+struct RwDevicePrefix {
+    float gammaCorrection;
+    void* system;
+    float zBufferNear;
+    float zBufferFar;
+    RenderStateSetFn renderStateSet;
+    RenderStateGetFn renderStateGet;
+};
+
+struct RwGlobalsPrefix {
+    void* currentCamera;
+    void* currentWorld;
+    uint16_t renderFrame;
+    uint16_t lightFrame;
+    uint16_t padding[2];
+    RwDevicePrefix device;
+};
+
+static_assert(offsetof(RwGlobalsPrefix, device.renderStateSet) == 0x20,
+              "unexpected RenderWare globals layout");
+static_assert(offsetof(RwGlobalsPrefix, device.renderStateGet) == 0x24,
+              "unexpected RenderWare globals layout");
+
+struct SavedRenderState {
+    int state = 0;
+    void* value = nullptr;
+    bool valid = false;
+};
+
+// DefinedState2d changes these states, while CSprite2d::DrawRect additionally
+// clears the texture raster. Texture U/V addressing is saved separately: the
+// combined TEXTUREADDRESS state can lose an asymmetric pair.
+constexpr int kAARenderStateIds[] = {
+    1,  // TEXTURERASTER
+    3,  // TEXTUREADDRESSU
+    4,  // TEXTUREADDRESSV
+    5,  // TEXTUREPERSPECTIVE
+    6,  // ZTESTENABLE
+    7,  // SHADEMODE
+    8,  // ZWRITEENABLE
+    9,  // TEXTUREFILTER
+    10, // SRCBLEND
+    11, // DESTBLEND
+    12, // VERTEXALPHAENABLE
+    13, // BORDERCOLOR
+    14, // FOGENABLE
+    20, // CULLMODE
+    29, // ALPHATESTFUNCTION
+    30, // ALPHATESTFUNCTIONREF
+};
+
+class RenderStateGuard {
+public:
+    RenderStateGuard() {
+        const auto* globals = *reinterpret_cast<RwGlobalsPrefix* const*>(
+            game::kRwEngineInstance);
+        if (!globals)
+            return;
+
+        set_ = globals->device.renderStateSet;
+        const auto get = globals->device.renderStateGet;
+        if (!set_ || !get) {
+            set_ = nullptr;
+            return;
+        }
+
+        for (size_t i = 0; i < _countof(saved_); ++i) {
+            auto& saved = saved_[i];
+            saved.state = kAARenderStateIds[i];
+            saved.valid = get(saved.state, &saved.value) != 0;
+        }
+    }
+
+    ~RenderStateGuard() {
+        if (!set_)
+            return;
+
+        for (size_t i = _countof(saved_); i != 0; --i) {
+            const auto& saved = saved_[i - 1];
+            if (saved.valid)
+                set_(saved.state, saved.value);
+        }
+    }
+
+    RenderStateGuard(const RenderStateGuard&) = delete;
+    RenderStateGuard& operator=(const RenderStateGuard&) = delete;
+
+private:
+    RenderStateSetFn set_ = nullptr;
+    SavedRenderState saved_[_countof(kAARenderStateIds)] = {};
+};
+
 using DrawHudFn = void (__cdecl*)();
 
 // The copied prologue of CHud::DrawCrossHairs followed by a jump back into it.
@@ -377,6 +474,12 @@ void HideAABugHook() {
     const float height = static_cast<float>(
         *reinterpret_cast<const int32_t*>(game::kScreenHeight));
 
+    // DefinedState2d disables depth testing/writes and changes a dozen other
+    // persistent RenderWare states. This hook runs at the very end of the 2D
+    // pass, so leaking those values makes some transparent world effects in
+    // the next frame (notably birds and skidmarks) render through geometry.
+    // Restore the exact incoming state after drawing the edge frame.
+    const RenderStateGuard stateGuard;
     DefinedState2d();
     DrawRect({0.0f, -5.0f, width, 0.5f});
     DrawRect({-5.0f, -1.0f, 0.5f, height});

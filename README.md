@@ -157,6 +157,19 @@ The FOV module converts the game's 4:3 horizontal FOV to the current aspect
 using the standard tangent conversion. It refuses to overwrite another
 plugin's `CDraw` hook.
 
+## Release Integrity
+
+Tagged release archives are built by GitHub Actions from the corresponding
+source revision. Each release includes a SHA-256 checksum and a signed build
+provenance attestation. Verify the attestation with GitHub CLI:
+
+```text
+gh attestation verify AspectRatioFixes-v1.1.1.zip -R sonochiwa/sa-aspect-ratio-fixes
+```
+
+This verifies the archive's origin and integrity; it is not a guarantee that
+the software is bug-free or safe.
+
 ## License
 
 MIT. See `LICENSE`.

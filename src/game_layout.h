@@ -40,6 +40,11 @@ constexpr uintptr_t kDrawRect = 0x00727B60;
 // DefinedState2d resets RenderWare state for untextured 2D primitives.
 constexpr uintptr_t kDefinedState2d = 0x00734750;
 
+// Pointer to RenderWare's non-debug RwGlobals instance. The AA edge-frame
+// hook snapshots the device render states through the callbacks stored there
+// before asking DefinedState2d to configure immediate-mode drawing.
+constexpr uintptr_t kRwEngineInstance = 0x00C97B24;
+
 // CMessages::AddMessageJump(const char*, uint32, uint16, bool).
 constexpr uintptr_t kAddMessageJump = 0x0069F1E0;
 
