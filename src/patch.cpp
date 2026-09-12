@@ -15,6 +15,9 @@ constexpr DWORD kReadableProtect = PAGE_READONLY | PAGE_READWRITE |
 // Offset of the absolute address inside an x87 [disp32] instruction.
 constexpr size_t kOperandOffset = 2;
 
+// The same inside `mov eax, [disp32]`, which has no ModR/M byte.
+constexpr size_t kMovEaxOperandOffset = 1;
+
 }  // namespace
 
 bool IsReadable(uintptr_t address, size_t size) {
@@ -93,6 +96,29 @@ bool RepointOperands(const uintptr_t* sites, size_t count, uintptr_t expected,
             return false;
     }
     return true;
+}
+
+bool IsMovEaxAbsoluteOperand(uintptr_t instruction, uintptr_t expected) {
+    if (!IsReadable(instruction, kMovEaxOperandOffset + sizeof(uint32_t)))
+        return false;
+
+    const auto* code = reinterpret_cast<const uint8_t*>(instruction);
+    if (code[0] != 0xA1)
+        return false;
+
+    uint32_t operand = 0;
+    std::memcpy(&operand, code + kMovEaxOperandOffset, sizeof(operand));
+    return operand == static_cast<uint32_t>(expected);
+}
+
+bool RepointMovEaxOperand(uintptr_t instruction, uintptr_t expected,
+                          const void* target) {
+    if (!IsMovEaxAbsoluteOperand(instruction, expected))
+        return false;
+
+    const auto address = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(target));
+    return WriteMemory(instruction + kMovEaxOperandOffset, &address,
+                       sizeof(address));
 }
 
 }  // namespace patch

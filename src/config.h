@@ -28,6 +28,15 @@ struct Settings {
     bool hideCameraHud = false;
     bool hideSniperHud = false;
 
+    // The weapon icon, ammo, bars, money, clock and wanted level, laid out
+    // for playerInfoAspect at playerInfoScale percent, the money's right
+    // margin at playerInfoMarginRight units of screen height. Zero keeps the
+    // game's own value for each.
+    bool fixPlayerInfo = true;
+    float playerInfoAspect = 16.0f / 9.0f;
+    int playerInfoScale = 0;
+    float playerInfoMarginRight = 0.0f;
+
     bool useScreenAspect = false;
     bool fixFov = true;
 
@@ -42,6 +51,11 @@ struct Settings {
     bool spriteWeaponEffects = true;
     bool spriteCameraEffects = true;
     bool spriteTargetingMeasurements = false;
+
+    // SA-MP textdraws are laid out for textdrawAspect and centred on any
+    // screen wider than that.
+    bool fitTextdraws = true;
+    float textdrawAspect = 16.0f / 9.0f;
 
     // Diagnostic. Corrects one candidate SCREEN_STRETCH_X site at a time so it
     // can be identified in game; see references\stretch-x-sites.md.

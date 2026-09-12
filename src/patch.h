@@ -39,4 +39,12 @@ bool RepointOperands(const uintptr_t (&sites)[N], uintptr_t expected,
     return RepointOperands(sites, N, expected, target);
 }
 
+// `mov eax, [disp32]` is the one byte opcode A1 followed by the address.
+// Returns true when `instruction` is that load and its operand currently
+// equals `expected`.
+bool IsMovEaxAbsoluteOperand(uintptr_t instruction, uintptr_t expected);
+
+bool RepointMovEaxOperand(uintptr_t instruction, uintptr_t expected,
+                          const void* target);
+
 }  // namespace patch

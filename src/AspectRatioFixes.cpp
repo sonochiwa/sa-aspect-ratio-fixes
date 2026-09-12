@@ -48,15 +48,17 @@
 #include "game_layout.h"
 #include "log.h"
 #include "patch.h"
+#include "samp_layout.h"
 
 namespace {
 
-constexpr char kVersion[] = "1.1.1";
+constexpr char kVersion[] = "1.2.0";
 
 // Stock values of the pooled literals the plugin repoints. They double as the
 // executable check: an executable that does not hold exactly these values at
 // these addresses is not the 1.0 US build this plugin was mapped against.
 constexpr float kStockStretchX  = 1.0f / 640.0f;
+constexpr float kStockStretchY  = 1.0f / 448.0f;
 constexpr float kStockRadarLeft = 40.0f;
 constexpr float kStockRadarTop  = 104.0f;
 constexpr float kStockRadarHigh = 76.0f;
@@ -129,6 +131,64 @@ volatile LONG g_spriteTargeting = 0;
 volatile LONG g_reloadNotificationPending = 0;
 
 float g_worldSpriteWidthCorrection = 1.0f;
+
+// SA-MP textdraw layout. CTextDraw::Draw reads `width` where it used to read
+// RsGlobal.maximumWidth, so with the screen's own width it lays out exactly as
+// stock, and with the width of a 16:9 area of the screen's height it lays out
+// as it would on a 16:9 display. `offset` is how far right that area sits.
+//
+// The two belong together: a width from one resolution beside an offset from
+// another puts every textdraw off centre for a frame. The worker publishes
+// them as one 64 bit value, and the draw hook takes both from it in one read
+// before the original runs.
+struct TextdrawLayout {
+    int32_t width;
+    float offset;
+};
+static_assert(sizeof(TextdrawLayout) == sizeof(LONGLONG),
+              "TextdrawLayout must fit one interlocked exchange");
+
+volatile LONGLONG g_textdrawLayoutPacked = 0;
+
+// Read by the two repointed loads in CTextDraw::Draw and by the forwarders
+// below, written only by the draw hook on the render thread. `scale` is the
+// layout width over the screen width, which is what every horizontal
+// quantity the font derives from the real width has to be multiplied by.
+int32_t g_textdrawWidth = 0;
+float g_textdrawOffset = 0.0f;
+float g_textdrawScale = 1.0f;
+
+// Read by the font's outline and drop shadow pass in place of the pooled
+// SCREEN_STRETCH_X factor. It holds the layout's factor only while a textdraw
+// is being printed, so the game's own text keeps its stock offsets.
+float g_fontStretchX = kStockStretchX;
+bool g_textdrawPrinting = false;
+
+// The player info block. The two factors are what its sites multiply the
+// width and height they read by; the width they read is `g_playerInfoWidth`,
+// so the horizontal factor is pixels per unit divided by that width and the
+// block's positions, measured back from it, land where the margin asks.
+// The icon's margin literal is the same fraction of that width.
+float g_playerInfoStretchX = kStockStretchX;
+float g_playerInfoStretchY = kStockStretchY;
+int32_t g_playerInfoWidth = 0;
+float g_weaponIconMargin = 0.0f;
+float g_weaponIconMarginStock = 0.0f;
+
+// The factors the helpers the block shares with the rest of the game use
+// while the block is drawn. They read the real screen size, so the
+// horizontal one is pixels per unit over the real width.
+float g_hudPassStretchX = kStockStretchX;
+float g_hudPassStretchY = kStockStretchY;
+float g_playerInfoPassStretchX = kStockStretchX;
+
+// The client functions the hooks forward to, resolved against the loaded
+// module once its build is known.
+uintptr_t g_sampDraw = 0;
+uintptr_t g_sampSpriteForward = 0;
+uintptr_t g_sampWrapxForward = 0;
+uintptr_t g_sampPrintForward = 0;
+bool g_textdrawsPatched = false;
 
 bool g_radarPatched = false;
 bool g_crosshairScalePatched = false;
@@ -311,6 +371,156 @@ DEFINE_SPRITE_WRAPPER(CalcCameraEffectSprite, g_spriteCameraEffects)
 DEFINE_SPRITE_WRAPPER(CalcTargetingSprite, g_spriteTargeting)
 
 #undef DEFINE_SPRITE_WRAPPER
+
+// CTextDraw::Draw is thiscall with no stack arguments, which a fastcall
+// function with an unused second parameter receives correctly: `this` in
+// ecx, garbage in edx, nothing to clean up.
+using TextDrawDrawFn = void (__fastcall*)(void*, void*);
+using TextDrawSpriteFn = void (__cdecl*)(void*, const Rect*, const void*);
+using TextDrawSetWrapxFn = void (__cdecl*)(float);
+using TextDrawPrintStringFn = void (__cdecl*)(float, float, const char*);
+
+void PublishTextdrawLayout(int32_t width, float offset) {
+    const TextdrawLayout layout = {width, offset};
+    LONGLONG packed = 0;
+    std::memcpy(&packed, &layout, sizeof(packed));
+    InterlockedExchange64(&g_textdrawLayoutPacked, packed);
+}
+
+// Takes the layout for this draw, runs the original against it and shifts
+// the click rectangle it stored, so a selectable textdraw is hit where it is
+// drawn. The rectangle is ints; the shift is rounded the same way the draw
+// rounds the positions it is derived from.
+void __fastcall TextDrawDrawHook(uint8_t* textdraw, void*) {
+    const LONGLONG packed =
+        InterlockedCompareExchange64(&g_textdrawLayoutPacked, 0, 0);
+    TextdrawLayout layout;
+    std::memcpy(&layout, &packed, sizeof(layout));
+    if (layout.width <= 0) {
+        layout.width = *reinterpret_cast<const int32_t*>(game::kScreenWidth);
+        layout.offset = 0.0f;
+    }
+    g_textdrawWidth = layout.width;
+    g_textdrawOffset = layout.offset;
+    const float screenWidth = static_cast<float>(
+        *reinterpret_cast<const int32_t*>(game::kScreenWidth));
+    g_textdrawScale = screenWidth > 0.0f
+        ? static_cast<float>(layout.width) / screenWidth
+        : 1.0f;
+
+    reinterpret_cast<TextDrawDrawFn>(g_sampDraw)(
+        textdraw, nullptr);
+
+    if (layout.offset == 0.0f)
+        return;
+
+    const auto shift = static_cast<int32_t>(std::lround(layout.offset));
+    int32_t edge = 0;
+    std::memcpy(&edge, textdraw + samp::kClickLeftOffset, sizeof(edge));
+    edge += shift;
+    std::memcpy(textdraw + samp::kClickLeftOffset, &edge, sizeof(edge));
+    std::memcpy(&edge, textdraw + samp::kClickRightOffset, sizeof(edge));
+    edge += shift;
+    std::memcpy(textdraw + samp::kClickRightOffset, &edge, sizeof(edge));
+}
+
+// The three forwarders below stand in for the calls that carry an X
+// position out of CTextDraw::Draw. Each shifts that position and hands the
+// call on to the function samp.dll was calling.
+void __cdecl TextDrawSpriteHook(void* sprite, const Rect* rect,
+                                const void* color) {
+    Rect shifted = *rect;
+    shifted.left += g_textdrawOffset;
+    shifted.right += g_textdrawOffset;
+    reinterpret_cast<TextDrawSpriteFn>(g_sampSpriteForward)(sprite, &shifted,
+                                                          color);
+}
+
+void __cdecl TextDrawSetWrapxHook(float wrap) {
+    reinterpret_cast<TextDrawSetWrapxFn>(g_sampWrapxForward)(
+        wrap + g_textdrawOffset);
+}
+
+// The print is where the font reads the real width, so the layout's factor is
+// published to the outline pass and to the box hook for exactly its duration.
+void __cdecl TextDrawPrintStringHook(float x, float y, const char* text) {
+    g_fontStretchX = kStockStretchX * g_textdrawScale;
+    g_textdrawPrinting = true;
+    reinterpret_cast<TextDrawPrintStringFn>(g_sampPrintForward)(
+        x + g_textdrawOffset, y, text);
+    g_textdrawPrinting = false;
+    g_fontStretchX = kStockStretchX;
+}
+
+using HudPassFn = void (__cdecl*)();
+
+// The block's text is printed and its bars are outlined inside these two
+// passes, so the font's outline offsets and the bar outline follow the
+// block's factor for exactly their duration and nothing else's.
+void RunHudPass(uintptr_t pass) {
+    g_fontStretchX = g_playerInfoPassStretchX;
+    g_hudPassStretchX = g_playerInfoPassStretchX;
+    g_hudPassStretchY = g_playerInfoStretchY;
+    reinterpret_cast<HudPassFn>(pass)();
+    g_hudPassStretchY = kStockStretchY;
+    g_hudPassStretchX = kStockStretchX;
+    g_fontStretchX = kStockStretchX;
+}
+
+void __cdecl DrawPlayerInfoHook() {
+    RunHudPass(game::kDrawPlayerInfo);
+}
+
+void __cdecl DrawWantedLevelHook() {
+    RunHudPass(game::kDrawWantedLevel);
+}
+
+using GetTextRectFn = void (__cdecl*)(Rect*, float, float, const char*);
+
+// Runs in place of the GetTextRect call inside CFont::PrintString. The rect
+// it returns is the textdraw's box: the text's extent padded on each side,
+// by 4 pixels in the stock game and by 4 units of the real screen size under
+// SilentPatch. The vertical padding is what a 16:9 display of this height
+// has as well. A horizontal one that equals the stretched stock value came
+// from the real width, so it is re-stretched by the layout width; anything
+// else, the stock 4 pixels included, is left as it is.
+void __cdecl FontGetTextRectHook(Rect* rect, float x, float y,
+                                 const char* text) {
+    reinterpret_cast<GetTextRectFn>(game::kFontGetTextRect)(rect, x, y, text);
+    if (!g_textdrawPrinting || g_textdrawScale == 1.0f)
+        return;
+
+    const float screenWidth = static_cast<float>(
+        *reinterpret_cast<const int32_t*>(game::kScreenWidth));
+    const float stretched =
+        game::kFontBoxPadding * screenWidth / game::kDesignWidth;
+    const float fitted = stretched * g_textdrawScale;
+    constexpr float kTolerance = 0.5f;
+
+    float leftPadding = 0.0f;
+    float rightPadding = 0.0f;
+    bool hasLeft = true;
+    if (*reinterpret_cast<const bool*>(game::kFontCentre)) {
+        const float half =
+            *reinterpret_cast<const float*>(game::kFontCentreSize) * 0.5f;
+        leftPadding = x - half - rect->left;
+        rightPadding = rect->right - x - half;
+    } else if (*reinterpret_cast<const bool*>(game::kFontRightJustify)) {
+        // The left edge comes from a wrap SA-MP never sets, so only the
+        // right one is the textdraw's.
+        hasLeft = false;
+        rightPadding = rect->right - x;
+    } else {
+        leftPadding = x - rect->left;
+        rightPadding =
+            rect->right - *reinterpret_cast<const float*>(game::kFontWrapX);
+    }
+
+    if (hasLeft && std::fabs(leftPadding - stretched) < kTolerance)
+        rect->left += leftPadding - fitted;
+    if (std::fabs(rightPadding - stretched) < kTolerance)
+        rect->right -= rightPadding - fitted;
+}
 
 void __cdecl SetFovHook(float fov) {
     if (InterlockedCompareExchange(&g_fixFov, 0, 0) != 0) {
@@ -519,6 +729,7 @@ bool HoldsStockValue(uintptr_t address, float expected) {
 
 bool IsSupportedExecutable() {
     return HoldsStockValue(game::kStretchX, kStockStretchX) &&
+           HoldsStockValue(game::kStretchY, kStockStretchY) &&
            HoldsStockValue(game::kRadarLeft, kStockRadarLeft) &&
            HoldsStockValue(game::kRadarTop, kStockRadarTop) &&
            HoldsStockValue(game::kRadarHigh, kStockRadarHigh) &&
@@ -547,6 +758,82 @@ void LogSettingConflicts() {
                        "scale");
     }
 
+}
+
+// Lays SA-MP textdraws out in a centred area of the configured aspect when the
+// screen is wider than that, and leaves them at the screen's own width
+// otherwise. A 16:9 screen is not wider than 16:9, so the plugin changes
+// nothing there; the small tolerance keeps 1920x1080, which is 1.7777 against
+// a 1.7778 setting, on that side of the line.
+void UpdateTextdrawLayout(float screenWidth, float screenHeight) {
+    constexpr float kAspectTolerance = 0.001f;
+    const float aspect = screenWidth / screenHeight;
+    const float layoutAspect = g_settings.textdrawAspect;
+
+    int32_t width = static_cast<int32_t>(screenWidth);
+    float offset = 0.0f;
+    const bool fitted = g_settings.fitTextdraws &&
+                        aspect > layoutAspect + kAspectTolerance;
+    if (fitted) {
+        width = static_cast<int32_t>(std::lround(screenHeight * layoutAspect));
+        offset = (screenWidth - static_cast<float>(width)) * 0.5f;
+    }
+    PublishTextdrawLayout(width, offset);
+
+    if (!g_textdrawsPatched)
+        return;
+    if (fitted) {
+        logging::Write("  textdraws: laid out %d px wide, %.1f px from the "
+                       "left (screen is wider than %.4f)",
+                       width, static_cast<double>(offset),
+                       static_cast<double>(layoutAspect));
+    } else if (g_settings.fitTextdraws) {
+        logging::Write("  textdraws: screen is not wider than %.4f, unchanged",
+                       static_cast<double>(layoutAspect));
+    } else {
+        logging::Write("  textdraws: unchanged (fitTextdraws=0)");
+    }
+}
+
+// The player info block is described by pixels per unit on each axis and the
+// width its positions are measured back from. The aspect chooses the
+// horizontal pixels per unit the way a display of that aspect and this height
+// would, the scale multiplies both axes, and the margin moves the anchor so
+// the money's right edge, 32 units in from the anchor, lands where asked. Each
+// of the three keeps the game's own value at zero.
+void UpdatePlayerInfoLayout(float screenWidth, float screenHeight) {
+    float pixelsX = screenWidth / game::kDesignWidth;
+    float pixelsY = screenHeight / game::kDesignHeight;
+    float anchor = screenWidth;
+
+    if (g_settings.fixPlayerInfo) {
+        if (g_settings.playerInfoAspect > 0.0f)
+            pixelsX = screenHeight * g_settings.playerInfoAspect / game::kDesignWidth;
+        if (g_settings.playerInfoScale > 0) {
+            const float scale = static_cast<float>(g_settings.playerInfoScale) / 100.0f;
+            pixelsX *= scale;
+            pixelsY *= scale;
+        }
+        if (g_settings.playerInfoMarginRight > 0.0f) {
+            constexpr float kMoneyMargin = 32.0f;
+            const float wanted = g_settings.playerInfoMarginRight *
+                                 screenHeight / game::kDesignHeight;
+            anchor = screenWidth - (wanted - kMoneyMargin * pixelsX);
+        }
+    }
+
+    // The anchor is read through an integer load, and the block is measured
+    // back from it in whole pixels either way.
+    const auto width = static_cast<int32_t>(std::lround(anchor));
+    if (width < kMinScreenSize)
+        return;
+
+    g_playerInfoStretchX = pixelsX / static_cast<float>(width);
+    g_playerInfoStretchY = pixelsY / screenHeight;
+    g_playerInfoPassStretchX = pixelsX / screenWidth;
+    g_weaponIconMargin = g_weaponIconMarginStock * game::kDesignWidth * pixelsX /
+                         static_cast<float>(width);
+    g_playerInfoWidth = width;
 }
 
 // Recomputes every plugin owned value for the current resolution. This runs on
@@ -607,6 +894,8 @@ void UpdateGeometry(const Resolution& resolution) {
     g_scopeStretchX = correctScope ? squareStretch : kStockStretchX;
     g_viewfinderWidth = correctScope ? game::kViewfinderHeight : 256.0f;
 
+    UpdatePlayerInfoLayout(screenWidth, screenHeight);
+
     // One unit of the lock-on marker's width covers screenWidth / 640 pixels
     // while one unit of its height covers screenHeight / 448, so the minimum
     // width has to be divided by the ratio of the two to clamp both axes to the
@@ -650,6 +939,19 @@ void UpdateGeometry(const Resolution& resolution) {
     logging::Write("  lock-on minimum width: %.4f units against %.1f tall",
                    static_cast<double>(g_lockOnMinWidth),
                    static_cast<double>(kLockOnMinHeight));
+    logging::Write("  player info: %.4f x %.4f px per unit (game default %.4f x "
+                   "%.4f), right edge %.1f px in",
+                   static_cast<double>(static_cast<float>(g_playerInfoWidth) *
+                                       g_playerInfoStretchX),
+                   static_cast<double>(screenHeight * g_playerInfoStretchY),
+                   static_cast<double>(pixelsPerUnitX),
+                   static_cast<double>(pixelsPerUnitY),
+                   static_cast<double>(screenWidth -
+                                       static_cast<float>(g_playerInfoWidth) +
+                                       32.0f * static_cast<float>(g_playerInfoWidth) *
+                                           g_playerInfoStretchX));
+
+    UpdateTextdrawLayout(screenWidth, screenHeight);
 
     LogSettingConflicts();
 }
@@ -781,17 +1083,47 @@ void RestoreRadarMask() {
 // already done so, which would undo a group without leaving any trace in the
 // log. Every group that applies is therefore remembered and re-read by the
 // watcher, so a group that stops pointing at us is reported once.
+//
+// A site's 32 bit operand is either an absolute address or, for a call, a
+// displacement from the next instruction; both resolve to the address the
+// site points at, which is what is compared.
 struct PatchedGroup {
     const char* name;
     const uintptr_t* sites;
     size_t count;
+    size_t operandOffset;
+    bool relative;
     uintptr_t target;
     bool reported;
 };
 
-constexpr size_t kMaxGuards = 16;
+constexpr size_t kMaxGuards = 32;
 PatchedGroup g_guards[kMaxGuards] = {};
 size_t g_guardCount = 0;
+
+// The operand of an x87 instruction with an absolute address starts two bytes
+// into it, which is what RepointOperands writes. `mov eax, [disp32]` has no
+// ModR/M byte, so its operand starts one byte in, and so does the
+// displacement of a relative call.
+constexpr size_t kOperandOffset = 2;
+constexpr size_t kMovEaxOperandOffset = 1;
+constexpr size_t kCallOperandOffset = 1;
+constexpr size_t kCallLength = 5;
+
+void RememberGuard(const char* name, const uintptr_t* sites, size_t count,
+                   size_t operandOffset, bool relative, const void* target) {
+    if (g_guardCount >= kMaxGuards)
+        return;
+
+    PatchedGroup& guard = g_guards[g_guardCount++];
+    guard.name = name;
+    guard.sites = sites;
+    guard.count = count;
+    guard.operandOffset = operandOffset;
+    guard.relative = relative;
+    guard.target = reinterpret_cast<uintptr_t>(target);
+    guard.reported = false;
+}
 
 template <size_t N>
 bool ApplyGroup(const char* name, const uintptr_t (&sites)[N],
@@ -801,20 +1133,10 @@ bool ApplyGroup(const char* name, const uintptr_t (&sites)[N],
                    applied ? "patched" : "SKIPPED, unexpected bytes",
                    static_cast<unsigned>(N));
 
-    if (applied && g_guardCount < kMaxGuards) {
-        PatchedGroup& guard = g_guards[g_guardCount++];
-        guard.name = name;
-        guard.sites = sites;
-        guard.count = N;
-        guard.target = reinterpret_cast<uintptr_t>(target);
-        guard.reported = false;
-    }
+    if (applied)
+        RememberGuard(name, sites, N, kOperandOffset, false, target);
     return applied;
 }
-
-// The operand of an x87 instruction with an absolute address starts two bytes
-// into it, which is what RepointOperands writes.
-constexpr size_t kOperandOffset = 2;
 
 void CheckGuards() {
     for (size_t g = 0; g < g_guardCount; ++g) {
@@ -824,11 +1146,15 @@ void CheckGuards() {
 
         for (size_t i = 0; i < guard.count; ++i) {
             int32_t operand = 0;
-            if (!patch::ReadInt32(guard.sites[i] + kOperandOffset, operand))
+            if (!patch::ReadInt32(guard.sites[i] + guard.operandOffset,
+                                  operand))
                 continue;
 
-            const auto current = static_cast<uintptr_t>(
-                static_cast<uint32_t>(operand));
+            const uintptr_t current =
+                guard.relative
+                    ? guard.sites[i] + kCallLength +
+                          static_cast<uintptr_t>(operand)
+                    : static_cast<uintptr_t>(static_cast<uint32_t>(operand));
             if (current == guard.target)
                 continue;
 
@@ -940,6 +1266,207 @@ void ApplyFovFix() {
     }
 }
 
+
+bool BytesMatch(uintptr_t address, const uint8_t* expected, size_t size) {
+    return patch::IsReadable(address, size) &&
+           std::memcmp(reinterpret_cast<const void*>(address), expected,
+                       size) == 0;
+}
+
+// The client is identified by its PE link timestamp rather than by a version
+// resource, because every 0.3.7 build reports 0.3.7 there.
+uint32_t ModuleTimeDateStamp(uintptr_t base) {
+    if (!patch::IsReadable(base, sizeof(IMAGE_DOS_HEADER)))
+        return 0;
+    const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
+    if (dos->e_magic != IMAGE_DOS_SIGNATURE || dos->e_lfanew <= 0)
+        return 0;
+
+    const uintptr_t headers = base + static_cast<uintptr_t>(dos->e_lfanew);
+    if (!patch::IsReadable(headers, sizeof(IMAGE_NT_HEADERS32)))
+        return 0;
+    const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS32*>(headers);
+    if (nt->Signature != IMAGE_NT_SIGNATURE)
+        return 0;
+    return nt->FileHeader.TimeDateStamp;
+}
+
+// Sites inside samp.dll, resolved against its base once it is found. They
+// have static storage because the guards keep pointing at them.
+uintptr_t g_sampDrawCallSite[1];
+uintptr_t g_sampSpriteWidthSite[1];
+uintptr_t g_sampTextWidthSite[1];
+uintptr_t g_sampSpriteCallSite[1];
+uintptr_t g_sampWrapxCallSite[1];
+uintptr_t g_sampPrintCallSite[1];
+
+// Every site is checked before the first one is written: the two width loads
+// against their full encoding, the four calls against the targets samp.dll
+// links them to. A call that another modification has already retargeted
+// fails that check and leaves the whole group untouched.
+void ApplySampTextdraws(const Resolution& resolution) {
+    const HMODULE module = GetModuleHandleA("samp.dll");
+    if (!module) {
+        logging::Write("samp textdraws         SKIPPED, samp.dll is not "
+                       "loaded");
+        return;
+    }
+
+    const auto base = reinterpret_cast<uintptr_t>(module);
+    const uint32_t stamp = ModuleTimeDateStamp(base);
+    const samp::Build* build = nullptr;
+    for (const samp::Build& candidate : samp::kBuilds) {
+        if (candidate.timeDateStamp == stamp)
+            build = &candidate;
+    }
+    if (!build) {
+        logging::Write("samp textdraws         SKIPPED, samp.dll build %08X "
+                       "is not mapped (0.3.7-R1 and 0.3.7-R3-1 are)",
+                       static_cast<unsigned>(stamp));
+        return;
+    }
+
+    g_sampDrawCallSite[0] = base + build->drawTextDrawCall;
+    g_sampSpriteWidthSite[0] = base + build->spriteWidthRead;
+    g_sampTextWidthSite[0] = base + build->textWidthRead;
+    g_sampSpriteCallSite[0] = base + build->spriteDrawCall;
+    g_sampWrapxCallSite[0] = base + build->setWrapxCall;
+    g_sampPrintCallSite[0] = base + build->printStringCall;
+
+    const bool intact =
+        RelativeCallTargets(g_sampDrawCallSite[0],
+                            base + build->textDrawDraw) &&
+        BytesMatch(g_sampSpriteWidthSite[0], samp::kSpriteWidthReadBytes,
+                   sizeof(samp::kSpriteWidthReadBytes)) &&
+        BytesMatch(g_sampTextWidthSite[0], samp::kTextWidthReadBytes,
+                   sizeof(samp::kTextWidthReadBytes)) &&
+        RelativeCallTargets(g_sampSpriteCallSite[0],
+                            base + build->spriteDrawForward) &&
+        RelativeCallTargets(g_sampWrapxCallSite[0],
+                            base + build->setWrapxForward) &&
+        RelativeCallTargets(g_sampPrintCallSite[0],
+                            base + build->printStringForward);
+    if (!intact) {
+        logging::Write("samp textdraws         SKIPPED, unexpected bytes (%s)",
+                       build->name);
+        return;
+    }
+
+    // The forwarders read their targets, the repointed loads read the width
+    // and the draw hook reads the layout, so all of them are in place before
+    // any branch can reach them. The width starts at the screen's own, which
+    // is what the loads were reading, in case a draw reaches the function
+    // without passing through the hook.
+    g_sampDraw = base + build->textDrawDraw;
+    g_sampSpriteForward = base + build->spriteDrawForward;
+    g_sampWrapxForward = base + build->setWrapxForward;
+    g_sampPrintForward = base + build->printStringForward;
+    g_textdrawWidth = resolution.width;
+    g_textdrawOffset = 0.0f;
+
+    bool applied = true;
+    applied &= patch::RepointOperands(g_sampSpriteWidthSite, game::kScreenWidth,
+                                      &g_textdrawWidth);
+    applied &= patch::RepointMovEaxOperand(g_sampTextWidthSite[0],
+                                           game::kScreenWidth,
+                                           &g_textdrawWidth);
+    applied &= WriteRelativeBranch(g_sampSpriteCallSite[0], 0xE8,
+                                   reinterpret_cast<const void*>(
+                                       TextDrawSpriteHook));
+    applied &= WriteRelativeBranch(g_sampWrapxCallSite[0], 0xE8,
+                                   reinterpret_cast<const void*>(
+                                       TextDrawSetWrapxHook));
+    applied &= WriteRelativeBranch(g_sampPrintCallSite[0], 0xE8,
+                                   reinterpret_cast<const void*>(
+                                       TextDrawPrintStringHook));
+    // The draw hook goes in last: everything it runs is already redirected.
+    applied &= WriteRelativeBranch(g_sampDrawCallSite[0], 0xE8,
+                                   reinterpret_cast<const void*>(
+                                       TextDrawDrawHook));
+
+    logging::Write("samp textdraws         %s (%s, 2 operands, 4 calls)",
+                   applied ? "patched" : "FAILED", build->name);
+    if (!applied)
+        return;
+
+    g_textdrawsPatched = true;
+    UpdateTextdrawLayout(static_cast<float>(resolution.width),
+                         static_cast<float>(resolution.height));
+    RememberGuard("samp width (sprite)", g_sampSpriteWidthSite, 1,
+                  kOperandOffset, false, &g_textdrawWidth);
+    RememberGuard("samp width (text)", g_sampTextWidthSite, 1,
+                  kMovEaxOperandOffset, false, &g_textdrawWidth);
+    RememberGuard("samp sprite call", g_sampSpriteCallSite, 1,
+                  kCallOperandOffset, true,
+                  reinterpret_cast<const void*>(TextDrawSpriteHook));
+    RememberGuard("samp wrap call", g_sampWrapxCallSite, 1,
+                  kCallOperandOffset, true,
+                  reinterpret_cast<const void*>(TextDrawSetWrapxHook));
+    RememberGuard("samp print call", g_sampPrintCallSite, 1,
+                  kCallOperandOffset, true,
+                  reinterpret_cast<const void*>(TextDrawPrintStringHook));
+    RememberGuard("samp draw call", g_sampDrawCallSite, 1,
+                  kCallOperandOffset, true,
+                  reinterpret_cast<const void*>(TextDrawDrawHook));
+}
+
+// The font's outline pass reads the pooled factor; the variable it is
+// repointed at holds the stock value except for the duration of a print that
+// asks for another, so this is a pass-through until one does.
+void ApplyFontOutline() {
+    ApplyGroup("font outline", game::kFontShadowStretchXSites, game::kStretchX,
+               &g_fontStretchX);
+}
+
+// The box behind a textdraw is sized inside the font from the real width.
+// The hook acts only while the client is printing one, so it is taken only
+// once the client's draw has been hooked.
+void ApplyFontBoxHook() {
+    ApplySpriteCallGroup("font box padding", game::kFontGetTextRectCallSites,
+                         game::kFontGetTextRect,
+                         reinterpret_cast<const void*>(FontGetTextRectHook));
+}
+
+// The block's four groups describe one layout between them: a factor over a
+// width that is not the one the sites read would put every size off, so all
+// of them are verified before any is written and either all apply or none
+// does. The shared helpers and the two pass wrappers are pass-throughs on
+// their own.
+void ApplyPlayerInfo(const Resolution& resolution) {
+    if (!patch::ReadFloat(game::kWeaponIconMargin, g_weaponIconMarginStock) ||
+        !patch::VerifyOperands(game::kPlayerInfoStretchXSites, game::kStretchX) ||
+        !patch::VerifyOperands(game::kPlayerInfoWidthReadSites,
+                               game::kScreenWidth) ||
+        !patch::VerifyOperands(game::kPlayerInfoStretchYSites, game::kStretchY) ||
+        !patch::VerifyOperands(game::kWeaponIconMarginSites,
+                               game::kWeaponIconMargin)) {
+        logging::Write("player info            SKIPPED, unexpected bytes");
+        return;
+    }
+
+    // The margin literal was not known when the geometry was first computed.
+    UpdatePlayerInfoLayout(static_cast<float>(resolution.width),
+                           static_cast<float>(resolution.height));
+
+    ApplyGroup("player info width", game::kPlayerInfoStretchXSites,
+               game::kStretchX, &g_playerInfoStretchX);
+    ApplyGroup("player info anchor", game::kPlayerInfoWidthReadSites,
+               game::kScreenWidth, &g_playerInfoWidth);
+    ApplyGroup("player info height", game::kPlayerInfoStretchYSites,
+               game::kStretchY, &g_playerInfoStretchY);
+    ApplyGroup("weapon icon margin", game::kWeaponIconMarginSites,
+               game::kWeaponIconMargin, &g_weaponIconMargin);
+    ApplyGroup("bar outline width", game::kHudPassStretchXSites,
+               game::kStretchX, &g_hudPassStretchX);
+    ApplyGroup("bar outline height", game::kHudPassStretchYSites,
+               game::kStretchY, &g_hudPassStretchY);
+    ApplySpriteCallGroup("player info pass", game::kDrawPlayerInfoCallSites,
+                         game::kDrawPlayerInfo,
+                         reinterpret_cast<const void*>(DrawPlayerInfoHook));
+    ApplySpriteCallGroup("wanted level pass", game::kDrawWantedLevelCallSites,
+                         game::kDrawWantedLevel,
+                         reinterpret_cast<const void*>(DrawWantedLevelHook));
+}
 
 void ApplyAABugFix() {
     if (!patch::IsReadable(game::kRender2dStuffReturn, 5)) {
@@ -1311,6 +1838,11 @@ DWORD WINAPI PluginThread(LPVOID parameter) {
 
     ApplyFovFix();
     ApplyWorldSprites();
+    ApplyFontOutline();
+    ApplyPlayerInfo(resolution);
+    ApplySampTextdraws(resolution);
+    if (g_textdrawsPatched)
+        ApplyFontBoxHook();
 
     ApplyAABugFix();
 

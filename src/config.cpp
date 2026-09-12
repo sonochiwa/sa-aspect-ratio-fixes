@@ -192,6 +192,49 @@ float ReadFloat(const char* path, const char* section, const char* key,
     return parsed;
 }
 
+// An aspect ratio is written the way it is spoken, "16:9", or as the plain
+// quotient, "1.7778". Both sides of the colon go through the same parser as
+// every other number in the file.
+bool ParseAspect(const char* text, float& value) {
+    const char* separator = text;
+    while (*separator != '\0' && *separator != ':' && *separator != '/')
+        ++separator;
+
+    if (*separator == '\0')
+        return ParseFloat(text, value);
+
+    float width = 0.0f;
+    float height = 0.0f;
+    if (!ParseFloat(text, width) || !ParseFloat(separator + 1, height))
+        return false;
+    if (width <= 0.0f || height <= 0.0f)
+        return false;
+
+    value = width / height;
+    return true;
+}
+
+float ReadAspect(const char* path, const char* section, const char* key,
+                 float fallback, float minimum, float maximum) {
+    char value[64] = {};
+    if (!ReadRaw(path, section, key, value))
+        return fallback;
+
+    float parsed = 0.0f;
+    if (!ParseAspect(value, parsed))
+        return fallback;
+
+    // Zero is the one value below the range that means something: keep the
+    // screen's own aspect.
+    if (parsed == 0.0f)
+        return 0.0f;
+    if (parsed < minimum)
+        return minimum;
+    if (parsed > maximum)
+        return maximum;
+    return parsed;
+}
+
 }  // namespace
 
 bool GetPath(HMODULE module, char (&path)[MAX_PATH]) {
@@ -270,6 +313,19 @@ Settings Load(const char* path) {
     settings.hideSniperHud =
         ReadBool(path, "crosshair", "hideSniperHud", false);
 
+    settings.fixPlayerInfo = ReadBool(path, "hud", "fixPlayerInfo", true);
+    settings.playerInfoAspect = ReadAspect(path, "hud", "playerInfoAspect",
+                                           16.0f / 9.0f, 1.0f, 4.0f);
+    settings.playerInfoScale = ReadInt(path, "hud", "playerInfoScale", 0);
+    if (settings.playerInfoScale != 0) {
+        if (settings.playerInfoScale < 25)
+            settings.playerInfoScale = 25;
+        if (settings.playerInfoScale > 400)
+            settings.playerInfoScale = 400;
+    }
+    settings.playerInfoMarginRight = ReadFloat(
+        path, "hud", "playerInfoMarginRight", 0.0f, 0.0f, 320.0f);
+
     settings.useScreenAspect =
         ReadBool(path, "widescreen", "useScreenAspect", false);
     settings.fixFov = ReadBool(path, "widescreen", "fixFov", true);
@@ -295,6 +351,10 @@ Settings Load(const char* path) {
         ReadBool(path, "worldSprites", "cameraEffects", true);
     settings.spriteTargetingMeasurements =
         ReadBool(path, "worldSprites", "targetingMeasurements", false);
+
+    settings.fitTextdraws = ReadBool(path, "samp", "fitTextdraws", true);
+    settings.textdrawAspect = ReadAspect(path, "samp", "textdrawAspect",
+                                         16.0f / 9.0f, 1.0f, 4.0f);
 
     settings.probeEnabled = ReadBool(path, "probe", "enabled", false);
     settings.probeGroup = ReadInt(path, "probe", "group", 0);

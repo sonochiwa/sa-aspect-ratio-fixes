@@ -124,6 +124,129 @@ constexpr uint8_t kDrawHudBodyPrologue[] = {
     0xA0, 0xC1, 0xA7, 0xC8, 0x00, // mov al, byte ptr ds:[C8A7C1]
 };
 
+// CFont. SA-MP prints a textdraw through CFont::PrintString and draws its
+// box through the font's background, so two things inside the font follow
+// the real screen width rather than the width the textdraw was laid out for:
+//
+// The box is sized by CFont::GetTextRect, which pads the text's extent by a
+// 4.0f literal on every side. SilentPatch repoints those operands at 4 units
+// stretched by the real screen size, which is what a textdraw's box has on a
+// 16:9 display too, except that the horizontal one comes out of the real
+// width. The call to GetTextRect inside PrintString is retargeted, and while
+// a textdraw is being printed a horizontal padding that equals the stretched
+// stock value is re-stretched by the layout width instead. The vertical one
+// is left alone, and so is the stock 4 pixels of an unpatched game.
+//
+// The outline and drop shadow pass offsets every copy of the string by
+// SCREEN_STRETCH_X(size). Those nine sites read the pooled factor like the
+// HUD does, so they are repointed at a variable that holds the layout's
+// factor while a textdraw is printed and the stock one otherwise.
+constexpr uintptr_t kFontGetTextRect     = 0x0071A620;
+constexpr uintptr_t kFontGetTextRectCallSites[] = {
+    0x0071A77B, // CFont::PrintString, the box behind the text
+};
+constexpr uintptr_t kFontCentre          = 0x00C71A79; // RenderState, bool
+constexpr uintptr_t kFontRightJustify    = 0x00C71A7A; // RenderState, bool
+constexpr uintptr_t kFontWrapX           = 0x00C71A88; // RenderState, float
+constexpr uintptr_t kFontCentreSize      = 0x00C71A8C; // RenderState, float
+constexpr float kFontBoxPadding = 4.0f;
+
+constexpr uintptr_t kFontShadowStretchXSites[] = {
+    0x00719C0D, 0x00719C6E, 0x00719D2D, 0x00719D94, 0x00719DD1,
+    0x00719E0E, 0x00719E4B, 0x00719E6F, 0x00719E97,
+};
+
+// The player info block: the weapon icon and its ammo, the health, armour and
+// breath bars, the money counter, the clock and the wanted level. CHud draws
+// all of it against the right edge: every width and horizontal margin as
+// SCREEN_STRETCH_X(units) taken from a screen width it reads on the spot,
+// every height and vertical position as SCREEN_STRETCH_Y(units). Three
+// things about the block are therefore decided by three sets of operands:
+//
+//   the horizontal factor, which sets the proportion the block is laid out
+//   for; the vertical factor, which with the horizontal one sets its size;
+//   and the width it is anchored to, which sets its margin from the edge.
+//
+// CHud::DrawPlayerInfo @ 0x58EAF0 draws the clock, the bars and the money and
+// positions the icon and the ammo, CHud::DrawWeaponIcon @ 0x58D7D0 draws the
+// icon, 0x5893B0 the ammo, 0x5890A0, 0x589190 and 0x589270 the three bars,
+// and CHud::DrawWantedLevel @ 0x58D9A0 the stars. The sites that position
+// the second player's icon and ammo are included so a two player game draws
+// both the same way.
+constexpr uintptr_t kPlayerInfoStretchXSites[] = {
+    0x0058EB3F, 0x0058EC0C,             // clock scale and position
+    0x0058EE7E, 0x0058EEF4,             // health bar position
+    0x0058EF50, 0x0058EFC5,             // armour bar position
+    0x0058F116, 0x0058F194,             // breath bar position
+    0x0058F55C, 0x0058F5F4,             // money scale and position
+    0x0058F91C, 0x0058F993,             // weapon icon position
+    0x0058F9D0, 0x0058FA5D,             // ammo position
+    0x0058D8C3, 0x0058D92D,             // CHud::DrawWeaponIcon, 47 wide
+    0x005894C5, 0x005894E9,             // ammo scale and centre size
+    0x00589155, 0x0058922D, 0x005892CA, // bar widths, 62, 62 and 109
+    0x0058937E,
+    0x0058DCB8, 0x0058DD00, 0x0058DD7E, // CHud::DrawWantedLevel
+    0x0058DF71, 0x0058DFE5,
+};
+
+// Every read of RsGlobal.maximumWidth in those functions. Each one either
+// feeds a site above or is the width a position is measured back from, so
+// repointing them all at one value anchors the block to that width while the
+// factor, divided by the same value, keeps every size what it was.
+constexpr uintptr_t kPlayerInfoWidthReadSites[] = {
+    0x0058EB39, 0x0058EBE2, 0x0058EE45, 0x0058EEAB, 0x0058EF15, // DrawPlayerInfo
+    0x0058EF7C, 0x0058F0DB, 0x0058F14B, 0x0058F556, 0x0058F5AE,
+    0x0058F8FA, 0x0058F956, 0x0058F9C6, 0x0058FA52,
+    0x0058D8BC, 0x0058D927,                                     // DrawWeaponIcon
+    0x005894BF, 0x005894E0,                                     // ammo
+    0x0058914F, 0x00589227, 0x005892BF, 0x00589378,             // bars
+    0x0058DCB2, 0x0058DCFA, 0x0058DD77, 0x0058DF6B, 0x0058DFDB, // DrawWantedLevel
+};
+
+// The vertical factor. Positions are measured down from the top edge as
+// plain products, so scaling this scales the block about the top edge.
+constexpr uintptr_t kPlayerInfoStretchYSites[] = {
+    0x0058EB29, 0x0058EBF9, 0x0058EE60, 0x0058EEC8, 0x0058EF32, // DrawPlayerInfo
+    0x0058EF99, 0x0058F0F8, 0x0058F168, 0x0058F546, 0x0058F5CE,
+    0x0058F90B, 0x0058F972, 0x0058F9C0, 0x0058FA4A,
+    0x0058D882, 0x0058D945,                                     // DrawWeaponIcon
+    0x005894AF,                                                 // ammo
+    0x0058913E, 0x00589216, 0x00589346,                         // bars
+    0x0058DCA2, 0x0058DD68, 0x0058DDF4, 0x0058DEE4, 0x0058DF55, // DrawWantedLevel
+    0x0058DF9B,
+};
+
+// The icon's 111 unit margin inside the block is a pre-multiplied literal,
+// 111 / 640, applied to the width read directly rather than through the
+// pooled factor. It is repointed at a variable that carries the same units
+// at the block's factor and width.
+constexpr uintptr_t kWeaponIconMargin = 0x00866C84;
+constexpr uintptr_t kWeaponIconMarginSites[] = {
+    0x0058F92D, 0x0058F9F5, // icon and ammo, first player
+    0x0058FA8E,             // ammo, second player
+};
+
+// Two helpers the block shares with the rest of the game: CSprite2d::
+// DrawBarChart outlines every bar SCREEN_STRETCH_X(2) by SCREEN_STRETCH_Y(2)
+// thick, and 0x588B60 moves a bar up by SCREEN_STRETCH_Y(units) while the
+// wanted level is hidden. Their sites are repointed at variables that hold
+// the block's factors only while the block is being drawn.
+constexpr uintptr_t kHudPassStretchXSites[] = {
+    0x007288F5, 0x00728941, // CSprite2d::DrawBarChart
+};
+constexpr uintptr_t kHudPassStretchYSites[] = {
+    0x00728864, 0x007288A9, // CSprite2d::DrawBarChart
+    0x00588B9C,             // bar offset helper
+};
+
+// CHud::Draw calls the two passes back to back. Both are wrapped so the
+// font's outline pass and the shared helpers use the block's factors for
+// exactly their duration.
+constexpr uintptr_t kDrawPlayerInfo = 0x0058EAF0;
+constexpr uintptr_t kDrawWantedLevel = 0x0058D9A0;
+constexpr uintptr_t kDrawPlayerInfoCallSites[] = {0x0058FBD6};
+constexpr uintptr_t kDrawWantedLevelCallSites[] = {0x0058FBDB};
+
 // CCamera layout in 1.0 US. The active camera index is a byte and each CCam
 // stores its eCamMode as a 16 bit value at +0x0C.
 constexpr uintptr_t kCamera = 0x00B6F028;
@@ -141,6 +264,7 @@ constexpr uintptr_t kTakePhoto = 0x00C8A7C1;
 
 // Pooled float literals.
 constexpr uintptr_t kStretchX   = 0x00859520; // 1.0f / 640.0f
+constexpr uintptr_t kStretchY   = 0x00859524; // 1.0f / 448.0f
 constexpr uintptr_t kRadarLeft  = 0x00858A10; // 40.0f,  radar left edge
 constexpr uintptr_t kRadarTop   = 0x00866B70; // 104.0f, radar top edge above the bottom
 constexpr uintptr_t kRadarHigh  = 0x00866B74; // 76.0f,  radar height

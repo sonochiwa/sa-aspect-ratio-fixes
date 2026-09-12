@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.2.0
+
+- Added `[hud]`. The weapon icon, its ammo, the health, armour and breath
+  bars, the money counter, the clock and the wanted level are laid out as one
+  block for `playerInfoAspect`, `16:9` by default, so an ultrawide screen
+  shows them the way a 16:9 display of the same height does instead of
+  stretched with the screen; `4:3` gives the original proportions, `0` keeps
+  the screen's own. `playerInfoScale` resizes the block about its top right
+  corner and `playerInfoMarginRight` sets its margin from the right edge in
+  units of screen height; zero keeps the game's own for each. Text outlines
+  and bar outlines follow the block, everything else in the game keeps the
+  stock values.
+- Added `samp.fitTextdraws`. SA-MP textdraws are laid out for a 16:9 display
+  and centred on any screen wider than that, so an ultrawide monitor shows
+  them at the proportions the server designed them for instead of stretched
+  by `aspect / (16/9)`. Text, boxes, sprites and model previews all follow,
+  and so does the rectangle a selectable textdraw is hit-tested against. The
+  aspect is `samp.textdrawAspect`, written as `16:9` or as a quotient, and a
+  screen that is not wider than it is left alone. The box padding SilentPatch
+  stretches by the screen width and the font's outline offsets follow the
+  layout as well, so a tight grid of boxed textdraws keeps the gaps it has on
+  a 16:9 display. The 0.3.7-R1 and 0.3.7-R3-1 clients are mapped; any other
+  `samp.dll` build, or one that another plugin has already modified at those
+  sites, is named in the log and left untouched.
+
 ## 1.1.1
 
 - Fixed the one-pixel AA edge frame inheriting RenderWare 2D state from the

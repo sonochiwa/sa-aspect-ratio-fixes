@@ -101,6 +101,7 @@
     <ClInclude Include="log.h" />
     <ClInclude Include="patch.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="samp_layout.h" />
   </ItemGroup>
 
   <ItemGroup>
