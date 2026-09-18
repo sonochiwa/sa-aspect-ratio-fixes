@@ -175,6 +175,18 @@ bool ReadBool(const char* path, const char* section, const char* key,
     return ReadInt(path, section, key, fallback ? 1 : 0) != 0;
 }
 
+// A count of pixels: never negative, and no larger than any screen the game
+// can open.
+int ReadPixels(const char* path, const char* section, const char* key,
+               int fallback) {
+    const int value = ReadInt(path, section, key, fallback);
+    if (value < 0)
+        return 0;
+    if (value > 4096)
+        return 4096;
+    return value;
+}
+
 float ReadFloat(const char* path, const char* section, const char* key,
                 float fallback, float minimum, float maximum) {
     char value[64] = {};
@@ -326,6 +338,10 @@ Settings Load(const char* path) {
     settings.playerInfoMarginRight = ReadFloat(
         path, "hud", "playerInfoMarginRight", 0.0f, 0.0f, 320.0f);
 
+    settings.fixText = ReadBool(path, "text", "fixText", true);
+    settings.textAspect =
+        ReadAspect(path, "text", "textAspect", 16.0f / 9.0f, 1.0f, 4.0f);
+
     settings.useScreenAspect =
         ReadBool(path, "widescreen", "useScreenAspect", false);
     settings.fixFov = ReadBool(path, "widescreen", "fixFov", true);
@@ -351,6 +367,11 @@ Settings Load(const char* path) {
         ReadBool(path, "worldSprites", "cameraEffects", true);
     settings.spriteTargetingMeasurements =
         ReadBool(path, "worldSprites", "targetingMeasurements", false);
+
+    settings.aaEdgeLeft = ReadPixels(path, "aaEdgeFrame", "left", 1);
+    settings.aaEdgeTop = ReadPixels(path, "aaEdgeFrame", "top", 1);
+    settings.aaEdgeRight = ReadPixels(path, "aaEdgeFrame", "right", 1);
+    settings.aaEdgeBottom = ReadPixels(path, "aaEdgeFrame", "bottom", 1);
 
     settings.fitTextdraws = ReadBool(path, "samp", "fitTextdraws", true);
     settings.textdrawAspect = ReadAspect(path, "samp", "textdrawAspect",

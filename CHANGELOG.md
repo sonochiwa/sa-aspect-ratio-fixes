@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.3.0
+
+- Changed the shipped INI to list every key commented out at its default. The
+  file as generated changes nothing; a key applies once it is uncommented and
+  changed, and goes back to its default when commented out or deleted again.
+  Existing files with explicit values keep working as before.
+- Added `[text]`. Every piece of text the game draws through its font,
+  subtitles, help boxes, area and vehicle names, big messages, script text,
+  the radio name and the frontend, keeps the proportions of a `textAspect`
+  display, `16:9` by default, whatever the screen's own, outlines included.
+  Textdraws and the player info block keep their own settings. `0` keeps the
+  screen's own proportions.
+- Added `[aaEdgeFrame]`. Each side of the frame covering the multisampling
+  edge bug, `left`, `top`, `right` and `bottom`, has its own thickness in
+  pixels: `1`, the default, covers the affected edge sample as before, more
+  draws a bar, `0` leaves that edge alone. With every side at zero the frame
+  is not drawn and its render pass is skipped.
+
 ## 1.2.0
 
 - Added `[hud]`. The weapon icon, its ammo, the health, armour and breath

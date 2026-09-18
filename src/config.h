@@ -37,6 +37,11 @@ struct Settings {
     int playerInfoScale = 0;
     float playerInfoMarginRight = 0.0f;
 
+    // Every other piece of text the game draws, at the proportions of a
+    // display of textAspect. Zero keeps the screen's own.
+    bool fixText = true;
+    float textAspect = 16.0f / 9.0f;
+
     bool useScreenAspect = false;
     bool fixFov = true;
 
@@ -51,6 +56,14 @@ struct Settings {
     bool spriteWeaponEffects = true;
     bool spriteCameraEffects = true;
     bool spriteTargetingMeasurements = false;
+
+    // The frame over the multisampling edge bug, in pixels per side. One
+    // covers the edge sample the bug affects, more draws a bar, zero leaves
+    // that edge alone.
+    int aaEdgeLeft = 1;
+    int aaEdgeTop = 1;
+    int aaEdgeRight = 1;
+    int aaEdgeBottom = 1;
 
     // SA-MP textdraws are laid out for textdrawAspect and centred on any
     // screen wider than that.

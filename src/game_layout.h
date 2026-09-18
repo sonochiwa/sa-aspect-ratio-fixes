@@ -139,8 +139,9 @@ constexpr uint8_t kDrawHudBodyPrologue[] = {
 //
 // The outline and drop shadow pass offsets every copy of the string by
 // SCREEN_STRETCH_X(size). Those nine sites read the pooled factor like the
-// HUD does, so they are repointed at a variable that holds the layout's
-// factor while a textdraw is printed and the stock one otherwise.
+// HUD does, so they are repointed at a variable that holds the factor of
+// whatever text is being printed: the layout's for a textdraw, the block's
+// during a HUD pass, the text module's for everything else.
 constexpr uintptr_t kFontGetTextRect     = 0x0071A620;
 constexpr uintptr_t kFontGetTextRectCallSites[] = {
     0x0071A77B, // CFont::PrintString, the box behind the text
@@ -154,6 +155,29 @@ constexpr float kFontBoxPadding = 4.0f;
 constexpr uintptr_t kFontShadowStretchXSites[] = {
     0x00719C0D, 0x00719C6E, 0x00719D2D, 0x00719D94, 0x00719DD1,
     0x00719E0E, 0x00719E4B, 0x00719E6F, 0x00719E97,
+};
+
+// Every piece of text the game draws sets its scale through one of two
+// doors, and every caller hands both a width it has already multiplied by
+// SCREEN_STRETCH_X. CFont::SetScale(float w, float h) stores the pair; the
+// HUD, script text, big messages and one subtitle branch use it.
+// CFont::SetScaleLang(float w, float h) is the same store behind a check of
+// the language, which widens the text for some of them, and never passes
+// through SetScale; help boxes, area and vehicle names, odd job messages, the
+// other subtitle branches and the frontend use that one. Hooking both
+// entries rescales the width for all of them at once. Each prologue is one
+// or two whole instructions with nothing position dependent in them, and
+// both functions are cdecl with nothing else on the stack.
+constexpr uintptr_t kFontSetScale = 0x00719380;
+constexpr uintptr_t kFontSetScaleBody = 0x00719388;
+constexpr uint8_t kFontSetScalePrologue[] = {
+    0x8B, 0x44, 0x24, 0x04, // mov eax, [esp+4]
+    0x8B, 0x4C, 0x24, 0x08, // mov ecx, [esp+8]
+};
+constexpr uintptr_t kFontSetScaleLang = 0x007193A0;
+constexpr uintptr_t kFontSetScaleLangBody = 0x007193A7;
+constexpr uint8_t kFontSetScaleLangPrologue[] = {
+    0x0F, 0xBE, 0x05, 0xCC, 0x67, 0xBA, 0x00, // movsx eax, byte ptr [BA67CC]
 };
 
 // The player info block: the weapon icon and its ammo, the health, armour and

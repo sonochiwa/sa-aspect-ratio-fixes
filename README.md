@@ -16,8 +16,12 @@ If another ASI already owns a hook, the conflicting group is skipped.
 - Black sniper surround without transparent side gaps.
 - Weapon icon, ammo, bars, money, clock and wanted level laid out as one
   block for a chosen aspect, with its scale and right margin adjustable.
+- Every other piece of text, subtitles, help boxes, area and vehicle names,
+  big messages, script text and the frontend, at the proportions of a chosen
+  aspect, outline included.
 - Optional camera crosshair removal and camera/sniper HUD suppression.
-- Four-sided one-pixel frame covering the game's multisampling edge bug.
+- Four-sided frame covering the game's multisampling edge bug, each side at
+  its own thickness in pixels or off.
 - Horizontal-plus FOV and real framebuffer aspect ratio on an unmodified
   `CDraw` path.
 - Selective width correction for pickups, coronas, reflections, sun/moon,
@@ -51,63 +55,80 @@ its `scripts` directory. Press Alt+H after editing the INI.
 ## Configuration
 
 ```ini
-# SA Aspect Ratio Fixes v1.2.0
+# SA Aspect Ratio Fixes v1.3.0
 # Created by sonochiwa
 # Source code: https://github.com/sonochiwa/sa-aspect-ratio-fixes
+# Every key is at its default. Uncomment one and change it to override it.
 
 [general]
-log=0
-showReloadMessage=1
-reloadHotkey=Alt+H
+#log=0
+#showReloadMessage=1
+#reloadHotkey=Alt+H
 
 [radar]
-roundRadar=1
-roundBlips=1
+#roundRadar=1
+#roundBlips=1
 # Only while roundRadar=1. Units of screen height, not pixels.
-diameter=86
-marginLeft=40
-marginBottom=28
+#diameter=86
+#marginLeft=40
+#marginBottom=28
 
 [crosshair]
-roundCrosshair=1
-roundScope=1
-noCameraCrosshair=0
-hideCameraHud=0
-hideSniperHud=0
+#roundCrosshair=1
+#roundScope=1
+#noCameraCrosshair=0
+#hideCameraHud=0
+#hideSniperHud=0
 
 [hud]
-fixPlayerInfo=1
+#fixPlayerInfo=1
 # The aspect the block is laid out for. 0 keeps the screen's own.
-playerInfoAspect=16:9
+#playerInfoAspect=16:9
 # Percent of that size. 0 keeps it.
-playerInfoScale=0
+#playerInfoScale=0
 # Right margin in units of screen height. 0 keeps the game's 32.
-playerInfoMarginRight=0
+#playerInfoMarginRight=0
+
+[text]
+#fixText=1
+# The aspect the text is proportioned for. 0 keeps the screen's own.
+#textAspect=16:9
 
 [widescreen]
-useScreenAspect=0
+#useScreenAspect=0
 # Does nothing while useScreenAspect=0.
-fixFov=1
+#fixFov=1
 
 [worldSprites]
-pickups=1
-coronas=1
-coronaReflections=1
-sunMoon=1
-pointLights=1
-birds=1
-clouds=1
-checkpoints=1
-weaponEffects=1
-cameraEffects=1
+#pickups=1
+#coronas=1
+#coronaReflections=1
+#sunMoon=1
+#pointLights=1
+#birds=1
+#clouds=1
+#checkpoints=1
+#weaponEffects=1
+#cameraEffects=1
+
+[aaEdgeFrame]
+# Pixels per side. 0 leaves that edge alone.
+#left=1
+#top=1
+#right=1
+#bottom=1
 
 [samp]
-fitTextdraws=1
+#fitTextdraws=1
 # The aspect the server laid its textdraws out for. Wider screens only.
-textdrawAspect=16:9
+#textdrawAspect=16:9
 ```
 
-Every key is an independent on/off switch and takes effect on the next reload.
+Every key ships commented out at its default, so the file as generated changes
+nothing: the plugin runs on its built-in values until a key is uncommented and
+changed, and a key that is commented out again, or deleted, is back at its
+default on the next reload. Every key is an independent switch and takes
+effect on the next reload.
 Two of them depend on another being on and say so in the file: the radar layout
 is used only while `roundRadar=1`, and `fixFov` does nothing while
 `useScreenAspect=0`, because the conversion scales by the screen aspect that
@@ -123,6 +144,22 @@ hand to experiment with it.
 `Shift`, then a letter, a digit or `F1` to `F12`. `none` disables it. A value
 the plugin cannot read is treated as a typo and leaves the default binding in
 place rather than silently unbinding the key.
+
+`[text]` covers every piece of text the game draws through its font that no
+other module already handles: subtitles, help boxes, area and vehicle names,
+big messages, script text, the radio name, the frontend. `textAspect` is the
+display aspect the text is proportioned for, `16:9` by default, so any
+screen shows it the way a 16:9 display of the same height would; `4:3` gives
+the original proportions and `0` keeps the screen's own. Positions, wrap
+widths and boxes drawn around text are not moved, only the glyphs and their
+outlines change width.
+
+`[aaEdgeFrame]` gives each side of the frame its thickness in pixels. `1`
+covers exactly the edge sample the multisampling bug affects, a larger value
+draws a black bar of that many pixels inward from the edge, and `0` leaves
+that edge alone, for a display or a driver profile that only shows the bug on
+some edges. With all four at zero the frame's render pass is skipped
+entirely, so the 2D state it would otherwise set and restore is never touched.
 
 `textdrawAspect` is the aspect the server designed its textdraws for, written
 as `16:9` or as the quotient `1.7778`. A screen that is not wider than it is
@@ -210,7 +247,18 @@ the positions are measured back from sets the margin, with the factor
 divided by that width so sizes stay put. The two passes are wrapped so that
 the font's outline offsets and the bar outline drawn by
 `CSprite2d::DrawBarChart` use the same factors for exactly their duration;
-every other bar and text in the game keeps the stock ones.
+every other bar in the game keeps the stock ones and every other piece of
+text the text module's.
+
+Every piece of text the game draws sets its scale through `CFont::SetScale`
+or `CFont::SetScaleLang`, a second entry that applies a language-dependent
+width and stores the result itself, and every caller hands both a width it
+has already multiplied by `SCREEN_STRETCH_X`. The plugin hooks the two
+entries and multiplies the width again by the ratio of the wanted pixels per
+unit to the real ones, except while a textdraw or the player info block is
+being drawn, which scale their own text. The font's outline pass reads the
+same ratio, so an outline keeps the proportions of its glyphs. Both hooks go
+in together or not at all, and the outline factor stays stock until they do.
 
 SA-MP maps textdraws to the framebuffer the way the game maps its HUD, so on a
 screen wider than 16:9 they are stretched by `aspect / (16/9)`.
@@ -230,8 +278,8 @@ applies to each copy of the string. The call to `GetTextRect` inside
 horizontal padding that equals the stretched stock value is re-stretched by
 the layout width; the nine `SCREEN_STRETCH_X` operands of the outline pass are
 repointed at a variable that holds the layout's factor for exactly the
-duration of that print. The game's own text is printed outside it and keeps
-its stock values.
+duration of that print. The game's own text is printed outside it, at the
+text module's factor.
 
 ## Release Integrity
 
@@ -240,7 +288,7 @@ source revision. Each release includes a SHA-256 checksum and a signed build
 provenance attestation. Verify the attestation with GitHub CLI:
 
 ```text
-gh attestation verify AspectRatioFixes-v1.2.0.zip -R sonochiwa/sa-aspect-ratio-fixes
+gh attestation verify AspectRatioFixes-v1.3.0.zip -R sonochiwa/sa-aspect-ratio-fixes
 ```
 
 This verifies the archive's origin and integrity; it is not a guarantee that

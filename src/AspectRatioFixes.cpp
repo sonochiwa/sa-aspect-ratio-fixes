@@ -52,7 +52,7 @@
 
 namespace {
 
-constexpr char kVersion[] = "1.2.0";
+constexpr char kVersion[] = "1.3.0";
 
 // Stock values of the pooled literals the plugin repoints. They double as the
 // executable check: an executable that does not hold exactly these values at
@@ -128,6 +128,10 @@ volatile LONG g_spriteCheckpoints = 0;
 volatile LONG g_spriteWeaponEffects = 0;
 volatile LONG g_spriteCameraEffects = 0;
 volatile LONG g_spriteTargeting = 0;
+volatile LONG g_aaEdgeLeft = 1;
+volatile LONG g_aaEdgeTop = 1;
+volatile LONG g_aaEdgeRight = 1;
+volatile LONG g_aaEdgeBottom = 1;
 volatile LONG g_reloadNotificationPending = 0;
 
 float g_worldSpriteWidthCorrection = 1.0f;
@@ -159,10 +163,22 @@ float g_textdrawOffset = 0.0f;
 float g_textdrawScale = 1.0f;
 
 // Read by the font's outline and drop shadow pass in place of the pooled
-// SCREEN_STRETCH_X factor. It holds the layout's factor only while a textdraw
-// is being printed, so the game's own text keeps its stock offsets.
+// SCREEN_STRETCH_X factor. It holds whatever the text being printed is
+// scaled by: the layout's factor while a textdraw is printed, the block's
+// during a HUD pass, and `g_textStretchX`, the factor of every other piece
+// of text, the rest of the time.
 float g_fontStretchX = kStockStretchX;
 bool g_textdrawPrinting = false;
+
+// Text in general. Every caller of CFont::SetScale passes a width it has
+// multiplied by the real SCREEN_STRETCH_X; the hook multiplies it again by
+// `g_textScale`, the ratio of the wanted pixels per unit to the real ones,
+// except inside a textdraw draw or a HUD pass, which scale their own text.
+float g_textScale = 1.0f;
+float g_textStretchX = kStockStretchX;
+bool g_textdrawDrawing = false;
+bool g_hudPassDrawing = false;
+bool g_textPatched = false;
 
 // The player info block. The two factors are what its sites multiply the
 // width and height they read by; the width they read is `g_playerInfoWidth`,
@@ -408,8 +424,10 @@ void __fastcall TextDrawDrawHook(uint8_t* textdraw, void*) {
         ? static_cast<float>(layout.width) / screenWidth
         : 1.0f;
 
+    g_textdrawDrawing = true;
     reinterpret_cast<TextDrawDrawFn>(g_sampDraw)(
         textdraw, nullptr);
+    g_textdrawDrawing = false;
 
     if (layout.offset == 0.0f)
         return;
@@ -449,7 +467,7 @@ void __cdecl TextDrawPrintStringHook(float x, float y, const char* text) {
     reinterpret_cast<TextDrawPrintStringFn>(g_sampPrintForward)(
         x + g_textdrawOffset, y, text);
     g_textdrawPrinting = false;
-    g_fontStretchX = kStockStretchX;
+    g_fontStretchX = g_textStretchX;
 }
 
 using HudPassFn = void (__cdecl*)();
@@ -458,13 +476,39 @@ using HudPassFn = void (__cdecl*)();
 // passes, so the font's outline offsets and the bar outline follow the
 // block's factor for exactly their duration and nothing else's.
 void RunHudPass(uintptr_t pass) {
+    g_hudPassDrawing = true;
     g_fontStretchX = g_playerInfoPassStretchX;
     g_hudPassStretchX = g_playerInfoPassStretchX;
     g_hudPassStretchY = g_playerInfoStretchY;
     reinterpret_cast<HudPassFn>(pass)();
     g_hudPassStretchY = kStockStretchY;
     g_hudPassStretchX = kStockStretchX;
-    g_fontStretchX = kStockStretchX;
+    g_fontStretchX = g_textStretchX;
+    g_hudPassDrawing = false;
+}
+
+using SetScaleFn = void (__cdecl*)(float, float);
+
+// The copied prologues of the two scale setters, each followed by a jump
+// back into its function.
+SetScaleFn g_setScaleOriginal = nullptr;
+SetScaleFn g_setScaleLangOriginal = nullptr;
+
+// The ratio is 1.0 while the module is off or not in, so there is no switch
+// to publish separately from it: glyphs and outline read values that one
+// function writes together.
+float ScaledTextWidth(float width) {
+    if (!g_textdrawDrawing && !g_hudPassDrawing)
+        width *= g_textScale;
+    return width;
+}
+
+void __cdecl FontSetScaleHook(float width, float height) {
+    g_setScaleOriginal(ScaledTextWidth(width), height);
+}
+
+void __cdecl FontSetScaleLangHook(float width, float height) {
+    g_setScaleLangOriginal(ScaledTextWidth(width), height);
 }
 
 void __cdecl DrawPlayerInfoHook() {
@@ -676,9 +720,23 @@ void DrawHudHook() {
 }
 
 // Rendered at the same tail point used by Widescreen Fix's HideAABug=2.
-// Coordinates deliberately extend beyond the surface: after rasterisation
-// they cover exactly the four one-pixel edge samples affected by MSAA.
+// Coordinates deliberately extend beyond the surface: at one pixel they
+// cover, after rasterisation, exactly the four one-pixel edge samples
+// affected by MSAA. Each side has its own thickness, a thicker side grows
+// inward from that same edge, and a frame with no side left is skipped
+// entirely so the 2D state is not touched for nothing.
 void HideAABugHook() {
+    const float left = static_cast<float>(
+        InterlockedCompareExchange(&g_aaEdgeLeft, 0, 0));
+    const float top = static_cast<float>(
+        InterlockedCompareExchange(&g_aaEdgeTop, 0, 0));
+    const float right = static_cast<float>(
+        InterlockedCompareExchange(&g_aaEdgeRight, 0, 0));
+    const float bottom = static_cast<float>(
+        InterlockedCompareExchange(&g_aaEdgeBottom, 0, 0));
+    if (left <= 0.0f && top <= 0.0f && right <= 0.0f && bottom <= 0.0f)
+        return;
+
     const float width = static_cast<float>(
         *reinterpret_cast<const int32_t*>(game::kScreenWidth));
     const float height = static_cast<float>(
@@ -691,10 +749,14 @@ void HideAABugHook() {
     // Restore the exact incoming state after drawing the edge frame.
     const RenderStateGuard stateGuard;
     DefinedState2d();
-    DrawRect({0.0f, -5.0f, width, 0.5f});
-    DrawRect({-5.0f, -1.0f, 0.5f, height});
-    DrawRect({0.0f, height - 1.5f, width, height + 5.0f});
-    DrawRect({width - 1.0f, 0.0f, width + 5.0f, height + 5.0f});
+    if (top > 0.0f)
+        DrawRect({0.0f, -5.0f, width, top - 0.5f});
+    if (left > 0.0f)
+        DrawRect({-5.0f, -1.0f, left - 0.5f, height});
+    if (bottom > 0.0f)
+        DrawRect({0.0f, height - bottom - 0.5f, width, height + 5.0f});
+    if (right > 0.0f)
+        DrawRect({width - right, 0.0f, width + 5.0f, height + 5.0f});
 }
 
 struct Resolution {
@@ -793,6 +855,33 @@ void UpdateTextdrawLayout(float screenWidth, float screenHeight) {
     } else {
         logging::Write("  textdraws: unchanged (fitTextdraws=0)");
     }
+}
+
+// Every other piece of text: the width its caller stretched by the real
+// factor is multiplied by the ratio of the wanted pixels per unit to it. The
+// outline pass reads the same ratio, so both stay stock until the scale
+// hooks are in; a scaled outline on unscaled glyphs is worse than neither.
+//
+// The ambient outline factor is written here, from the worker. A reload that
+// lands while the render thread is inside a HUD pass or a textdraw print
+// overrides that pass's factor for its remainder; the pass restores the
+// ambient value when it ends, so the effect is confined to that one frame.
+void UpdateTextLayout(float screenWidth, float screenHeight) {
+    const float pixelsPerUnitX = screenWidth / game::kDesignWidth;
+    float textPixelsX = pixelsPerUnitX;
+    if (g_textPatched && g_settings.fixText && g_settings.textAspect > 0.0f)
+        textPixelsX = screenHeight * g_settings.textAspect / game::kDesignWidth;
+    g_textScale = textPixelsX / pixelsPerUnitX;
+    g_textStretchX = g_textScale * kStockStretchX;
+    g_fontStretchX = g_textStretchX;
+
+    // Logged from here rather than with the rest of the geometry, so the
+    // figure printed at startup is the one computed after the hooks went in.
+    if (!g_textPatched)
+        return;
+    logging::Write("  text: %.4f px per unit wide (game default %.4f)",
+                   static_cast<double>(textPixelsX),
+                   static_cast<double>(pixelsPerUnitX));
 }
 
 // The player info block is described by pixels per unit on each axis and the
@@ -895,6 +984,8 @@ void UpdateGeometry(const Resolution& resolution) {
     g_viewfinderWidth = correctScope ? game::kViewfinderHeight : 256.0f;
 
     UpdatePlayerInfoLayout(screenWidth, screenHeight);
+
+    UpdateTextLayout(screenWidth, screenHeight);
 
     // One unit of the lock-on marker's width covers screenWidth / 640 pixels
     // while one unit of its height covers screenHeight / 448, so the minimum
@@ -1411,8 +1502,8 @@ void ApplySampTextdraws(const Resolution& resolution) {
 }
 
 // The font's outline pass reads the pooled factor; the variable it is
-// repointed at holds the stock value except for the duration of a print that
-// asks for another, so this is a pass-through until one does.
+// repointed at holds the text module's factor, stock until that module is
+// in, except for the duration of a print that asks for another.
 void ApplyFontOutline() {
     ApplyGroup("font outline", game::kFontShadowStretchXSites, game::kStretchX,
                &g_fontStretchX);
@@ -1430,10 +1521,16 @@ void ApplyFontBoxHook() {
 // The block's four groups describe one layout between them: a factor over a
 // width that is not the one the sites read would put every size off, so all
 // of them are verified before any is written and either all apply or none
-// does. The shared helpers and the two pass wrappers are pass-throughs on
-// their own.
+// does. The two pass wrappers are verified with them: they are what keeps
+// the text module away from text the block has already scaled, so a block
+// without them would have its text scaled twice. The shared helpers' sites
+// are pass-throughs on their own.
 void ApplyPlayerInfo(const Resolution& resolution) {
     if (!patch::ReadFloat(game::kWeaponIconMargin, g_weaponIconMarginStock) ||
+        !RelativeCallTargets(game::kDrawPlayerInfoCallSites[0],
+                             game::kDrawPlayerInfo) ||
+        !RelativeCallTargets(game::kDrawWantedLevelCallSites[0],
+                             game::kDrawWantedLevel) ||
         !patch::VerifyOperands(game::kPlayerInfoStretchXSites, game::kStretchX) ||
         !patch::VerifyOperands(game::kPlayerInfoWidthReadSites,
                                game::kScreenWidth) ||
@@ -1487,7 +1584,7 @@ void ApplyAABugFix() {
     const bool applied = WriteRelativeBranch(game::kRender2dStuffReturn, 0xE9,
                                               reinterpret_cast<const void*>(
                                                   HideAABugHook));
-    logging::Write("AA edge frame          %s (four sides)",
+    logging::Write("AA edge frame          %s (pixels per side from the INI)",
                    applied ? "patched" : "FAILED");
 }
 
@@ -1533,6 +1630,55 @@ bool InstallTrampolineHook(uintptr_t address, const uint8_t* expected,
     *resume = nullptr;
     VirtualFree(trampoline, 0, MEM_RELEASE);
     return false;
+}
+
+// Text in general is rescaled at the two entries every caller goes through.
+// Both prologues are verified before either is written, and a second install
+// that fails puts the first prologue back, so the module is in or out as a
+// whole: text scaled at one door and not the other would be worse than
+// neither. The hooks are pass-throughs while fixText is off, so a reload can
+// turn the module on without rewriting code mid-frame.
+void ApplyTextScale(const Resolution& resolution) {
+    constexpr size_t kStolen = sizeof(game::kFontSetScalePrologue);
+    constexpr size_t kStolenLang = sizeof(game::kFontSetScaleLangPrologue);
+
+    if (!BytesMatch(game::kFontSetScale, game::kFontSetScalePrologue,
+                        kStolen) ||
+        !BytesMatch(game::kFontSetScaleLang,
+                        game::kFontSetScaleLangPrologue, kStolenLang)) {
+        logging::Write("text scale hooks       SKIPPED, unexpected prologue");
+        return;
+    }
+
+    void* resume = nullptr;
+    if (!InstallTrampolineHook(game::kFontSetScale, game::kFontSetScalePrologue,
+                               kStolen, game::kFontSetScaleBody,
+                               reinterpret_cast<const void*>(FontSetScaleHook),
+                               &resume)) {
+        logging::Write("text scale hooks       FAILED (CFont::SetScale entry)");
+        return;
+    }
+    g_setScaleOriginal = reinterpret_cast<SetScaleFn>(resume);
+
+    void* resumeLang = nullptr;
+    if (!InstallTrampolineHook(
+            game::kFontSetScaleLang, game::kFontSetScaleLangPrologue,
+            kStolenLang, game::kFontSetScaleLangBody,
+            reinterpret_cast<const void*>(FontSetScaleLangHook),
+            &resumeLang)) {
+        patch::WriteMemory(game::kFontSetScale, game::kFontSetScalePrologue,
+                           kStolen);
+        logging::Write("text scale hooks       FAILED (CFont::SetScaleLang "
+                       "entry, SetScale restored)");
+        return;
+    }
+    g_setScaleLangOriginal = reinterpret_cast<SetScaleFn>(resumeLang);
+
+    g_textPatched = true;
+    UpdateTextLayout(static_cast<float>(resolution.width),
+                     static_cast<float>(resolution.height));
+    logging::Write("text scale hooks       patched (CFont::SetScale and "
+                   "SetScaleLang entries)");
 }
 
 // Hooks CHud::DrawCrossHairs at its own entry. The call to it inside
@@ -1711,6 +1857,10 @@ void PublishRenderSettings() {
                         g_settings.spriteCameraEffects ? 1 : 0);
     InterlockedExchange(&g_spriteTargeting,
                         g_settings.spriteTargetingMeasurements ? 1 : 0);
+    InterlockedExchange(&g_aaEdgeLeft, g_settings.aaEdgeLeft);
+    InterlockedExchange(&g_aaEdgeTop, g_settings.aaEdgeTop);
+    InterlockedExchange(&g_aaEdgeRight, g_settings.aaEdgeRight);
+    InterlockedExchange(&g_aaEdgeBottom, g_settings.aaEdgeBottom);
 }
 
 void ApplyReloadedSettings(HMODULE module, const char* path,
@@ -1839,6 +1989,7 @@ DWORD WINAPI PluginThread(LPVOID parameter) {
     ApplyFovFix();
     ApplyWorldSprites();
     ApplyFontOutline();
+    ApplyTextScale(resolution);
     ApplyPlayerInfo(resolution);
     ApplySampTextdraws(resolution);
     if (g_textdrawsPatched)
