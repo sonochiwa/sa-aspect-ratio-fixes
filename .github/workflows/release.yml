@@ -56,46 +56,6 @@ jobs:
           New-Item -ItemType Directory -Path $stage -Force | Out-Null
           Copy-Item build\AspectRatioFixes.asi, build\AspectRatioFixes.ini -Destination $stage
 
-          $extras = Join-Path $stage "optional"
-          New-Item -ItemType Directory -Path $extras -Force | Out-Null
-          Copy-Item extras\cameraCrosshair.png -Destination $extras
-          Copy-Item extras\README.md -Destination (Join-Path $extras README.txt)
-
-          $readme = @(
-              "SA Aspect Ratio Fixes v$version"
-              "Created by sonochiwa"
-              ""
-              "A modular aspect-ratio correction suite for GTA San Andreas. It"
-              "corrects HUD geometry, aiming overlays, gameplay FOV and selected"
-              "world sprites without applying a single global scale to unrelated"
-              "effects."
-              ""
-              "Installation"
-              ""
-              "  1. Extract AspectRatioFixes.asi and AspectRatioFixes.ini into the"
-              "     GTA San Andreas directory or into its scripts directory."
-              "  2. Start the game."
-              ""
-              "Requires GTA San Andreas 1.0 US (or a SA-MP installation based on it)"
-              "and an ASI loader. Any other executable version is left untouched."
-              ""
-              "The optional directory holds a replacement camera viewfinder"
-              "texture. It is cosmetic and is not required; its own README"
-              "explains how to install it."
-              ""
-              "Every setting is documented in AspectRatioFixes.ini and in the"
-              "repository README. Set log=1 to have the plugin record the geometry"
-              "it computed and the result of every patch group in"
-              "AspectRatioFixes.log."
-              ""
-              "Source code: https://github.com/sonochiwa/sa-aspect-ratio-fixes"
-          ) -join [Environment]::NewLine
-          [IO.File]::WriteAllText(
-              (Join-Path $stage README.txt),
-              $readme,
-              [Text.UTF8Encoding]::new($false)
-          )
-
           Compress-Archive -Path "$stage\*" -DestinationPath $archive -Force
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
           "$hash  $archiveName" | Set-Content -LiteralPath $checksum -Encoding ascii
