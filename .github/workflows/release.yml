@@ -108,14 +108,6 @@ jobs:
           }
           $notes = @(
               $match.Groups['body'].Value.Trim()
-              ""
-              "### Verifying the download"
-              ""
-              "The archive was built by GitHub Actions from tag ``${{ github.ref_name }}``. Compare it with the published SHA-256 file or verify its signed build provenance:"
-              ""
-              '```text'
-              "gh attestation verify $archiveName -R $env:GITHUB_REPOSITORY"
-              '```'
           ) -join [Environment]::NewLine
           [IO.File]::WriteAllText(
               (Join-Path build release-notes.md),
