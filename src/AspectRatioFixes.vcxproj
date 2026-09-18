@@ -49,33 +49,35 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
       <SDLCheck>false</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS;WIN32_LEAN_AND_MEAN;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(SolutionDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>kernel32.lib;user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <GenerateMapFile>true</GenerateMapFile>
-      <MapFileName>$(OutDir)$(TargetName).map</MapFileName>
     </Link>
   </ItemDefinitionGroup>
 
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>false</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;_USRDLL;_CRT_SECURE_NO_WARNINGS;WIN32_LEAN_AND_MEAN;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(SolutionDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -83,38 +85,60 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <AdditionalDependencies>kernel32.lib;user32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <GenerateMapFile>true</GenerateMapFile>
-      <MapFileName>$(OutDir)$(TargetName).map</MapFileName>
     </Link>
   </ItemDefinitionGroup>
 
   <ItemGroup>
-    <ClCompile Include="config.cpp" />
     <ClCompile Include="AspectRatioFixes.cpp" />
+    <ClCompile Include="aa_edge.cpp" />
+    <ClCompile Include="config.cpp" />
+    <ClCompile Include="crosshair.cpp" />
+    <ClCompile Include="game.cpp" />
+    <ClCompile Include="geometry.cpp" />
+    <ClCompile Include="hooking.cpp" />
+    <ClCompile Include="hud.cpp" />
     <ClCompile Include="log.cpp" />
     <ClCompile Include="patch.cpp" />
+    <ClCompile Include="player_info.cpp" />
+    <ClCompile Include="probe.cpp" />
+    <ClCompile Include="radar.cpp" />
+    <ClCompile Include="text.cpp" />
+    <ClCompile Include="textdraws.cpp" />
+    <ClCompile Include="world.cpp" />
   </ItemGroup>
-
   <ItemGroup>
+    <ClInclude Include="aa_edge.h" />
+    <ClInclude Include="addresses.h" />
+    <ClInclude Include="addresses_radar.h" />
     <ClInclude Include="config.h" />
-    <ClInclude Include="game_layout.h" />
+    <ClInclude Include="crosshair.h" />
+    <ClInclude Include="game.h" />
+    <ClInclude Include="geometry.h" />
+    <ClInclude Include="hooking.h" />
+    <ClInclude Include="hud.h" />
     <ClInclude Include="log.h" />
     <ClInclude Include="patch.h" />
+    <ClInclude Include="player_info.h" />
+    <ClInclude Include="probe.h" />
+    <ClInclude Include="radar.h" />
     <ClInclude Include="resource.h" />
-    <ClInclude Include="samp_layout.h" />
+    <ClInclude Include="samp_addresses.h" />
+    <ClInclude Include="text.h" />
+    <ClInclude Include="textdraws.h" />
+    <ClInclude Include="types.h" />
+    <ClInclude Include="version.h" />
+    <ClInclude Include="world.h" />
   </ItemGroup>
-
   <ItemGroup>
     <ResourceCompile Include="AspectRatioFixes.rc" />
   </ItemGroup>
-
   <ItemGroup>
+    <None Include="..\.github\workflows\release.yml" />
     <None Include="..\CHANGELOG.md" />
-    <None Include="..\Config\AspectRatioFixes.ini" />
     <None Include="..\LICENSE" />
     <None Include="..\README.md" />
+    <None Include="..\Config\AspectRatioFixes.ini" />
   </ItemGroup>
-
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 
   <Target Name="CopyReleaseConfig" AfterTargets="Build"

@@ -30,18 +30,23 @@ namespace samp {
 
 struct Build {
     const char* name;
-    uint32_t timeDateStamp; // IMAGE_FILE_HEADER.TimeDateStamp
+    // IMAGE_FILE_HEADER.TimeDateStamp
+    uint32_t timeDateStamp;
 
     // CTextDrawPool::Draw walks the pool and calls CTextDraw::Draw once per
     // textdraw. That call is the one place every textdraw passes through, so
     // it is where the layout is published for the frame and the click
     // rectangle is shifted after the original has stored it.
-    uintptr_t drawTextDrawCall; // call CTextDraw::Draw
-    uintptr_t textDrawDraw;     // CTextDraw::Draw
+    // call CTextDraw::Draw
+    uintptr_t drawTextDrawCall;
+    // CTextDraw::Draw
+    uintptr_t textDrawDraw;
 
     // The two RsGlobal.maximumWidth loads, one per path.
-    uintptr_t spriteWidthRead;  // fild dword ptr [C17044]
-    uintptr_t textWidthRead;    // mov  eax, [C17044]
+    // fild dword ptr [C17044]
+    uintptr_t spriteWidthRead;
+    // mov  eax, [C17044]
+    uintptr_t textWidthRead;
 
     // Calls that carry an X position out of CTextDraw::Draw. Each targets a
     // small cdecl forwarder inside samp.dll; the plugin retargets the call and
@@ -80,7 +85,7 @@ constexpr uint8_t kTextWidthReadBytes[] = {
 
 // CTextDraw fields. The draw stores the rectangle a selectable textdraw is
 // hit-tested against, as int32 pixels, and the selection code reads it back.
-constexpr size_t kClickLeftOffset  = 0x9C1;
+constexpr size_t kClickLeftOffset = 0x9C1;
 constexpr size_t kClickRightOffset = 0x9C9;
 
 }  // namespace samp

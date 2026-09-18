@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.4.0
+
+- Changed the shipped INI back to explicit values: every key is present at
+  its default and the file the plugin creates is the file to edit. An
+  existing file with commented-out keys keeps working.
+- Changed the reload hotkey to the numeric form used by the other plugins:
+  `hotkeyEnabled`, `hotkeyModifier` and `hotkeyKey` under `[general]`, Alt+H
+  by default. `reloadHotkey=Alt+H` is no longer read; the probe hotkey uses
+  the same three keys under `[probe]`.
+- Changed `showReloadMessage` to `showNotifications`.
+- Added version information to the plugin file.
+- Removed `README.txt` and the optional texture from the release archive; the
+  repository README is the documentation and the texture stays in `extras`.
+
 ## 1.3.0
 
 - Changed the shipped INI to list every key commented out at its default. The

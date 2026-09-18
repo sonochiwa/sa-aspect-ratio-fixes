@@ -1,9 +1,9 @@
 *.log
 .vs/
 *.user
+.agents/
+.claude/
+.codex/
 
 build/
-dist/
 references/
-
-.claude/settings.local.json

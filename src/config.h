@@ -4,17 +4,21 @@
 
 namespace config {
 
-// A key with an optional modifier, both as Win32 virtual-key codes. A key of
-// 0 means the hotkey is disabled.
+// A key with an optional modifier, both as decimal Win32 virtual-key codes.
+// A key of 0, or enabled=false, means the hotkey is off.
 struct Hotkey {
+    bool enabled;
     int modifier;
     int key;
+
+    bool IsDown() const;
 };
 
 struct Settings {
     bool log = false;
-    bool showReloadMessage = true;
-    Hotkey reloadHotkey = {VK_MENU, 'H'};
+    bool showNotifications = true;
+    // Reloads the INI.
+    Hotkey hotkey = {true, VK_MENU, 'H'};
 
     bool roundRadar = true;
     bool roundBlips = true;
@@ -74,7 +78,7 @@ struct Settings {
     // can be identified in game; see references\stretch-x-sites.md.
     bool probeEnabled = false;
     int probeGroup = 0;
-    Hotkey probeHotkey = {VK_MENU, 'P'};
+    Hotkey probeHotkey = {true, VK_MENU, 'P'};
 };
 
 // Builds "<module directory>\<module name>.ini". Returns false when the path
