@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.1
+
+- Fixed the sniper fill covering the MSAA edge line on its own; the line
+  now shows or hides uniformly per `[aaEdgeFrame]`.
+
 ## 1.4.0
 
 - Changed the shipped INI back to explicit values: every key is present at

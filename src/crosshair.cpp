@@ -49,7 +49,9 @@ DrawCrossHairsFn g_drawCrossHairsOriginal = nullptr;
 // Vanilla's outer filler still ends at the old, wider bounds. Extending
 // black from the screen edges to the corrected bounds closes those two gaps.
 // One pixel of overlap prevents fractional coordinates/MSAA from opening a
-// seam.
+// seam. The outer edges stop exactly at the screen like vanilla's own
+// filler, so the MSAA edge line stays the same across the whole width and
+// [aaEdgeFrame] alone decides whether it is covered.
 void DrawSniperSideFill() {
     if (!game_api::IsSniperCamera())
         return;
@@ -62,11 +64,10 @@ void DrawSniperSideFill() {
     // not on screen.
     const float halfScope = 210.0f * width * g_scopeStretchX;
     const float center = width * 0.5f;
-    constexpr float kOutside = 5.0f;
     constexpr float kOverlap = 1.0f;
 
-    game_api::DrawBlackRect({-kOutside, -kOutside, center - halfScope + kOverlap, height + kOutside});
-    game_api::DrawBlackRect({center + halfScope - kOverlap, -kOutside, width + kOutside, height + kOutside});
+    game_api::DrawBlackRect({0.0f, 0.0f, center - halfScope + kOverlap, height});
+    game_api::DrawBlackRect({center + halfScope - kOverlap, 0.0f, width, height});
 }
 
 } // namespace

@@ -62,7 +62,7 @@ camera viewfinder texture; `extras\README.md` explains how to install it.
 ## Configuration
 
 ```ini
-# Aspect Ratio Fixes v1.4.0
+# Aspect Ratio Fixes v1.4.1
 # Created by sonochiwa
 # Source code: https://github.com/sonochiwa/sa-aspect-ratio-fixes
 # Default reload hotkey: Alt + H
