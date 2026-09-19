@@ -93,6 +93,5 @@ jobs:
             "${{ steps.package.outputs.archive }}" `
             "${{ steps.package.outputs.checksum }}" `
             --verify-tag `
-            --latest `
-            --title "SA Aspect Ratio Fixes v${{ steps.package.outputs.version }}" `
+            --title "Aspect Ratio Fixes v${{ steps.package.outputs.version }}" `
             --notes-file build\release-notes.md
