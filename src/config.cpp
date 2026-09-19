@@ -145,30 +145,17 @@ float ReadAspect(const char* path, const char* section, const char* key,
     return parsed;
 }
 
-// The trio every hotkey in the file uses. A missing, empty or zero key
-// disables the hotkey rather than falling back to the compiled default.
-Hotkey ReadHotkey(const char* path, const char* section, const Hotkey& defaults) {
-    Hotkey hotkey = defaults;
-    hotkey.enabled = ReadBool(path, section, "hotkeyEnabled", defaults.enabled);
-    hotkey.modifier = ReadInt(path, section, "hotkeyModifier", defaults.modifier);
+// A missing key keeps the compiled default; a present empty one disables
+// the command rather than falling back to it.
+void ReadCommand(const char* path, const char* section, char (&command)[kCommandCapacity]) {
     char value[64] = {};
-    hotkey.key = ReadRaw(path, section, "hotkeyKey", value) ? ReadInt(path, section, "hotkeyKey", 0) : 0;
-    if (hotkey.modifier < 0 || hotkey.modifier > 0xFF)
-        hotkey.modifier = 0;
-    if (hotkey.key < 0 || hotkey.key > 0xFF)
-        hotkey.key = 0;
-    return hotkey;
+    GetPrivateProfileStringA(section, "command", command, value,
+                             static_cast<DWORD>(sizeof(value)), path);
+    std::strncpy(command, value, kCommandCapacity - 1);
+    command[kCommandCapacity - 1] = '\0';
 }
 
 }  // namespace
-
-bool Hotkey::IsDown() const {
-    if (!enabled || key == 0)
-        return false;
-    const bool keyDown = (GetAsyncKeyState(key) & 0x8000) != 0;
-    const bool modifierDown = modifier == 0 || (GetAsyncKeyState(modifier) & 0x8000) != 0;
-    return keyDown && modifierDown;
-}
 
 bool GetPath(HMODULE module, char (&path)[MAX_PATH]) {
     const DWORD length = GetModuleFileNameA(module, path, MAX_PATH);
@@ -218,9 +205,7 @@ Settings Load(const char* path) {
     Settings settings;
 
     settings.log = ReadBool(path, "general", "log", false);
-    settings.showNotifications =
-        ReadBool(path, "general", "showNotifications", true);
-    settings.hotkey = ReadHotkey(path, "general", settings.hotkey);
+    ReadCommand(path, "general", settings.command);
     settings.roundRadar = ReadBool(path, "radar", "roundRadar", true);
     settings.roundBlips = ReadBool(path, "radar", "roundBlips", true);
     settings.radarDiameter =
@@ -296,7 +281,7 @@ Settings Load(const char* path) {
     settings.probeGroup = ReadInt(path, "probe", "group", 0);
     if (settings.probeGroup < 0 || settings.probeGroup > 1)
         settings.probeGroup = 0;
-    settings.probeHotkey = ReadHotkey(path, "probe", settings.probeHotkey);
+    ReadCommand(path, "probe", settings.probeCommand);
     return settings;
 }
 

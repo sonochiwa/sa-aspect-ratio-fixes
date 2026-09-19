@@ -22,7 +22,9 @@ the display's actual aspect ratio.
 - SA-MP textdraws laid out for 16:9 and centred on wider screens.
 - Black frame covering the multisampling edge line.
 - Optional camera crosshair removal and camera/sniper HUD suppression.
-- INI reload on Alt+H.
+- INI reload by typing `ASPECTFIXES` in game.
+- Verifies the bytes it replaces before writing and refuses to patch any
+  other executable.
 
 ## Requirements
 
@@ -45,86 +47,14 @@ texture; `extras\README.md` explains how to install it.
 
 ## Configuration
 
-```ini
-# Aspect Ratio Fixes v1.4.1
-# Created by sonochiwa
-# Source code: https://github.com/sonochiwa/sa-aspect-ratio-fixes
-# Default reload hotkey: Alt + H
-
-[general]
-log=0
-showNotifications=1
-hotkeyEnabled=1
-hotkeyModifier=18
-hotkeyKey=72
-
-[radar]
-roundRadar=1
-roundBlips=1
-# Only while roundRadar=1. Units of screen height, not pixels.
-diameter=86
-marginLeft=40
-marginBottom=28
-
-[crosshair]
-roundCrosshair=1
-roundScope=1
-noCameraCrosshair=0
-hideCameraHud=0
-hideSniperHud=0
-
-[hud]
-fixPlayerInfo=1
-# The aspect the block is laid out for. 0 keeps the screen's own.
-playerInfoAspect=16:9
-# Percent of that size. 0 keeps it.
-playerInfoScale=0
-# Right margin in units of screen height. 0 keeps the game's 32.
-playerInfoMarginRight=0
-
-[text]
-fixText=1
-# The aspect the text is proportioned for. 0 keeps the screen's own.
-textAspect=16:9
-
-[widescreen]
-useScreenAspect=0
-# Does nothing while useScreenAspect=0.
-fixFov=1
-
-[worldSprites]
-pickups=1
-coronas=1
-coronaReflections=1
-sunMoon=1
-pointLights=1
-birds=1
-clouds=1
-checkpoints=1
-weaponEffects=1
-cameraEffects=1
-
-[aaEdgeFrame]
-# Pixels per side. 0 leaves that edge alone.
-left=1
-top=1
-right=1
-bottom=1
-
-[samp]
-fitTextdraws=1
-# The aspect the server laid its textdraws out for. Wider screens only.
-textdrawAspect=16:9
-```
+`AspectRatioFixes.ini` next to the plugin, created with these defaults when it
+is missing:
 
 | Setting | Default | Meaning |
 | --- | ---: | --- |
 | `[general]` | | |
 | `log` | `0` | Writes `AspectRatioFixes.log` next to the plugin: the geometry it computed and the result of every patch group. |
-| `showNotifications` | `1` | Shows a game message when the INI is reloaded. |
-| `hotkeyEnabled` | `1` | Enables the reload hotkey. |
-| `hotkeyModifier` | `18` | Modifier as a decimal Win32 virtual-key code; `18` is Alt, `0` means none. |
-| `hotkeyKey` | `72` | Main key as a decimal Win32 virtual-key code; `72` is H. Removing it or setting `0` disables the hotkey. |
+| `command` | `ASPECTFIXES` | Word that reloads the INI when typed in game. Empty disables it. |
 | `[radar]` | | |
 | `roundRadar` | `1` | Gives the radar frame one scale on both axes, so the circle is round. |
 | `roundBlips` | `1` | Draws blip icons as wide as they are tall. |
@@ -156,11 +86,13 @@ textdrawAspect=16:9
 | `fitTextdraws` | `1` | Lays SA-MP textdraws out in a centred area of `textdrawAspect` on wider screens. |
 | `textdrawAspect` | `16:9` | The aspect the server laid its textdraws out for. Screens not wider than it are left alone. |
 
-Every key is a switch and takes effect on the next reload; Alt+H reloads the
-INI in game. The radar layout applies only while `roundRadar=1`, and `fixFov`
-only while `useScreenAspect=1`. The aspect keys name the display an element
-was designed for: `16:9` keeps the familiar look on an ultrawide screen,
-`4:3` gives the original proportions, `0` uses the screen's own.
+Every key is a switch and takes effect on the next reload. Type the command
+word in game the way a single-player cheat is typed, with the chat box open or
+closed; a message confirms the reload. The radar layout applies only while
+`roundRadar=1`, and `fixFov` only while `useScreenAspect=1`. The aspect keys
+name the display an element was designed for: `16:9` keeps the familiar look
+on an ultrawide screen, `4:3` gives the original proportions, `0` uses the
+screen's own.
 
 ## Release Integrity
 

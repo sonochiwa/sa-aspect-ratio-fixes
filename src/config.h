@@ -4,21 +4,13 @@
 
 namespace config {
 
-// A key with an optional modifier, both as decimal Win32 virtual-key codes.
-// A key of 0, or enabled=false, means the hotkey is off.
-struct Hotkey {
-    bool enabled;
-    int modifier;
-    int key;
-
-    bool IsDown() const;
-};
+// A word typed in game like a single-player cheat. Empty means off.
+constexpr size_t kCommandCapacity = 32;
 
 struct Settings {
     bool log = false;
-    bool showNotifications = true;
     // Reloads the INI.
-    Hotkey hotkey = {true, VK_MENU, 'H'};
+    char command[kCommandCapacity] = "ASPECTFIXES";
 
     bool roundRadar = true;
     bool roundBlips = true;
@@ -78,7 +70,7 @@ struct Settings {
     // can be identified in game; see references\stretch-x-sites.md.
     bool probeEnabled = false;
     int probeGroup = 0;
-    Hotkey probeHotkey = {true, VK_MENU, 'P'};
+    char probeCommand[kCommandCapacity] = "ASPECTPROBE";
 };
 
 // Builds "<module directory>\<module name>.ini". Returns false when the path

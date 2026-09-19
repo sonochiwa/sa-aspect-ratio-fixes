@@ -42,6 +42,8 @@ jobs:
           Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Path $stage -Force | Out-Null
           Copy-Item build\AspectRatioFixes.asi, build\AspectRatioFixes.ini -Destination $stage
+          (Get-Content .github\release\README.txt -Raw).Replace('{version}', $version) |
+              Set-Content -LiteralPath (Join-Path $stage README.txt) -Encoding ascii -NoNewline
 
           Compress-Archive -Path "$stage\*" -DestinationPath $archive -Force
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()

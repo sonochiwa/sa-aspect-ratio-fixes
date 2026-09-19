@@ -12,9 +12,9 @@ void Apply(const config::Settings& settings);
 // Publishes the current selection into the slots and describes it in the
 // log and on screen.
 void UpdateSelection(const config::Settings& settings);
-// Steps the selection on the hotkey's rising edge: none, each site in turn,
+// Steps the selection each time the probe command is typed: none, each site in turn,
 // the whole group, none again.
-void ServiceHotkey(const config::Settings& settings, bool& wasDown);
+void ServiceCommand(const config::Settings& settings);
 // Run by the HUD hook on the game thread.
 void ShowPendingNotification();
 // The horizontal factor a corrected slot holds.

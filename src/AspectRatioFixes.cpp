@@ -19,9 +19,10 @@
 // to be redirected at a hook, and every site is verified before it is
 // written. Each module below owns its variables and its sites; this file
 // only decides the order they go in, follows the framebuffer size, and
-// reloads the INI on the hotkey.
+// reloads the INI on the typed command.
 
 #include "aa_edge.h"
+#include "cheat_command.h"
 #include "config.h"
 #include "crosshair.h"
 #include "geometry.h"
@@ -51,6 +52,8 @@ void PublishRenderSettings() {
     hud::PublishSettings(g_settings);
     world::PublishSettings(g_settings);
     aa_edge::PublishSettings(g_settings);
+    cheat_command::SetWord(cheat_command::Command::Reload, g_settings.command);
+    cheat_command::SetWord(cheat_command::Command::Probe, g_settings.probeCommand);
 }
 
 void ApplyReloadedSettings(HMODULE module, const char* path, const Resolution& resolution) {
@@ -72,19 +75,15 @@ void ApplyReloadedSettings(HMODULE module, const char* path, const Resolution& r
     PublishRenderSettings();
     probe::UpdateSelection(g_settings);
     logging::Write("configuration reloaded");
-
-    if (g_settings.showNotifications)
-        hud::RequestReloadNotification();
+    hud::RequestReloadNotification();
 
     if (!reloaded.log && previous.log)
         logging::Disable();
 }
 
-void ServiceReloadHotkey(HMODULE module, const char* path, const Resolution& resolution, bool& wasDown) {
-    const bool down = g_settings.hotkey.IsDown();
-    if (down && !wasDown)
+void ServiceReloadCommand(HMODULE module, const char* path, const Resolution& resolution) {
+    if (cheat_command::Consume(cheat_command::Command::Reload))
         ApplyReloadedSettings(module, path, resolution);
-    wasDown = down;
 }
 
 DWORD WINAPI PluginThread(LPVOID parameter) {
@@ -124,7 +123,7 @@ DWORD WINAPI PluginThread(LPVOID parameter) {
     geometry::Update(g_settings, resolution);
 
     // Patch every configurable module once. Disabled modules publish the
-    // exact stock constants, so the reload hotkey can enable them without
+    // exact stock constants, so a reload can enable them without
     // modifying executable instructions while the render thread is active.
     radar::Apply(g_settings);
     crosshair::Apply();
@@ -150,10 +149,14 @@ DWORD WINAPI PluginThread(LPVOID parameter) {
 
     // Keep following the framebuffer size. Only plugin owned variables are
     // written from here, never game code.
-    bool hotkeyWasDown = false;
-    bool probeKeyWasDown = false;
+    bool commandsHooked = false;
     for (;;) {
         Sleep(kWatcherPollMs);
+
+        // The game window appears after RenderWare is up, so the keyboard
+        // hook can only go in from here.
+        if (!commandsHooked)
+            commandsHooked = cheat_command::Install();
 
         Resolution current;
         if (geometry::GetResolution(current) && !(current == resolution)) {
@@ -162,8 +165,8 @@ DWORD WINAPI PluginThread(LPVOID parameter) {
             probe::UpdateSelection(g_settings);
         }
 
-        ServiceReloadHotkey(module, path, resolution, hotkeyWasDown);
-        probe::ServiceHotkey(g_settings, probeKeyWasDown);
+        ServiceReloadCommand(module, path, resolution);
+        probe::ServiceCommand(g_settings);
         hooking::CheckGuards();
     }
 }

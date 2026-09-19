@@ -1,5 +1,6 @@
 #include "probe.h"
 
+#include "cheat_command.h"
 #include "addresses.h"
 #include "addresses_radar.h"
 #include "game.h"
@@ -70,7 +71,7 @@ void Apply(const config::Settings& settings) {
         }
     }
 
-    logging::Write("probe                  patched group %d (%u sites), step with the probe hotkey",
+    logging::Write("probe                  patched group %d (%u sites), step with the probe command",
                    settings.probeGroup, static_cast<unsigned>(g_count));
     for (size_t i = 0; i < g_count; ++i)
         logging::Write("  probe %2u  0x%08X", static_cast<unsigned>(i + 1), static_cast<unsigned>(g_sites[i]));
@@ -102,20 +103,16 @@ void UpdateSelection(const config::Settings& settings) {
     InterlockedExchange(&g_notificationPending, 1);
 }
 
-void ServiceHotkey(const config::Settings& settings, bool& wasDown) {
-    if (!settings.probeEnabled || g_count == 0) {
-        wasDown = false;
+void ServiceCommand(const config::Settings& settings) {
+    if (!cheat_command::Consume(cheat_command::Command::Probe))
         return;
-    }
+    if (!settings.probeEnabled || g_count == 0)
+        return;
 
-    const bool down = settings.probeHotkey.IsDown();
-    if (down && !wasDown) {
-        ++g_index;
-        if (g_index > static_cast<int>(g_count))
-            g_index = -1;
-        UpdateSelection(settings);
-    }
-    wasDown = down;
+    ++g_index;
+    if (g_index > static_cast<int>(g_count))
+        g_index = -1;
+    UpdateSelection(settings);
 }
 
 void ShowPendingNotification() {

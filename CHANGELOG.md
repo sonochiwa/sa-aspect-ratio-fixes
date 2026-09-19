@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0
+
+- Changed the INI reload to a word typed in game, `ASPECTFIXES` by default;
+  the hotkey keys are gone and the reload message is always shown.
+- Added `README.txt` to the release archive.
+
 ## 1.4.1
 
 - Fixed the sniper fill covering the MSAA edge line on its own; the line

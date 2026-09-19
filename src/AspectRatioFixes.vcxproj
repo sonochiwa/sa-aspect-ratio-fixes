@@ -91,6 +91,7 @@
   <ItemGroup>
     <ClCompile Include="AspectRatioFixes.cpp" />
     <ClCompile Include="aa_edge.cpp" />
+    <ClCompile Include="cheat_command.cpp" />
     <ClCompile Include="config.cpp" />
     <ClCompile Include="crosshair.cpp" />
     <ClCompile Include="game.cpp" />
@@ -110,6 +111,7 @@
     <ClInclude Include="aa_edge.h" />
     <ClInclude Include="addresses.h" />
     <ClInclude Include="addresses_radar.h" />
+    <ClInclude Include="cheat_command.h" />
     <ClInclude Include="config.h" />
     <ClInclude Include="crosshair.h" />
     <ClInclude Include="game.h" />
