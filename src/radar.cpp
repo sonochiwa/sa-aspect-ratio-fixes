@@ -17,6 +17,8 @@ float g_left = kStockRadarLeft;
 float g_top = kStockRadarTop;
 float g_high = kStockRadarHigh;
 float g_wide = kStockRadarWide;
+float g_ringInset = kStockRadarRingInset;
+float g_maskPad = kStockRadarMaskPad;
 float g_stretchX = kStockStretchX;
 float g_blipStretchX = kStockStretchX;
 bool g_patched = false;
@@ -30,6 +32,8 @@ bool SitesVerify() {
            patch::VerifyOperands(game::kRadarTopSites, game::kRadarTop) &&
            patch::VerifyOperands(game::kRadarHighSites, game::kRadarHigh) &&
            patch::VerifyOperands(game::kRadarWideSites, game::kRadarWide) &&
+           patch::VerifyOperands(game::kRadarRingInsetSites, game::kRadarRingInset) &&
+           patch::VerifyOperands(game::kRadarMaskPadSites, game::kRadarMaskPad) &&
            patch::VerifyOperands(game::kDependentTopSites, game::kRadarTop) &&
            patch::VerifyOperands(game::kDependentHighSites, game::kRadarHigh);
 }
@@ -52,6 +56,10 @@ void Apply(const config::Settings& settings) {
     applied &= hooking::ApplyGroup("radar top", game::kRadarTopSites, game::kRadarTop, &g_top);
     applied &= hooking::ApplyGroup("radar height", game::kRadarHighSites, game::kRadarHigh, &g_high);
     applied &= hooking::ApplyGroup("radar width", game::kRadarWideSites, game::kRadarWide, &g_wide);
+    applied &= hooking::ApplyGroup("plane ring inset", game::kRadarRingInsetSites,
+                                   game::kRadarRingInset, &g_ringInset);
+    applied &= hooking::ApplyGroup("corner mask pad", game::kRadarMaskPadSites,
+                                   game::kRadarMaskPad, &g_maskPad);
     applied &= hooking::ApplyGroup("dependent top", game::kDependentTopSites, game::kRadarTop, &g_top);
     applied &= hooking::ApplyGroup("dependent height", game::kDependentHighSites, game::kRadarHigh, &g_high);
 
@@ -105,12 +113,22 @@ void UpdateGeometry(const config::Settings& settings, float screenWidth, float s
         g_high = settings.radarDiameter;
         g_left = settings.radarMarginLeft;
         g_top = settings.radarMarginBottom + settings.radarDiameter;
+        // The plane ring and the corner masks are padded by fixed units that
+        // fit the stock radar width. At any other diameter the horizon shading
+        // stops short of the map's edge or runs past the black ring, and a
+        // smaller radar shows a gap between the map and the ring. Scaled with
+        // the diameter, both keep the stock width's coverage.
+        const float paddingScale = settings.radarDiameter / kStockRadarWide;
+        g_ringInset = kStockRadarRingInset * paddingScale;
+        g_maskPad = kStockRadarMaskPad * paddingScale;
     } else {
         g_stretchX = kStockStretchX;
         g_wide = kStockRadarWide;
         g_high = kStockRadarHigh;
         g_left = kStockRadarLeft;
         g_top = kStockRadarTop;
+        g_ringInset = kStockRadarRingInset;
+        g_maskPad = kStockRadarMaskPad;
     }
 
     g_blipStretchX = settings.roundBlips ? squareStretch : kStockStretchX;

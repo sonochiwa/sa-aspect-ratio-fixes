@@ -305,6 +305,10 @@ constexpr uintptr_t kRadarTop = 0x00866B70;
 constexpr uintptr_t kRadarHigh = 0x00866B74;
 // 94.0f,  radar width
 constexpr uintptr_t kRadarWide = 0x00866B78;
+// 18.0f,  among other uses how much smaller than the radar the plane ring is
+constexpr uintptr_t kRadarRingInset = 0x00859008;
+// 4.0f,   among other uses how far the corner masks reach past the radar
+constexpr uintptr_t kRadarMaskPad = 0x00858B90;
 
 // CRadar::DrawRadarMask. Some square radar modifications replace the prologue
 // with a RET or a JMP; restoring it brings the circular mask back.

@@ -58,6 +58,20 @@ constexpr uintptr_t kRadarWideSites[] = {
     0x0058A99B, // CHud::DrawRadar, corner mask 4
 };
 
+// Fixed HUD unit paddings of the frame. They only fit the radar at its stock
+// size, so a resized radar has to scale them with it.
+
+// CHud::DrawRadar, plane ring sprite: the `fmul` and the `fld` of 18.0f that
+// set its corner radius to the radar width and height minus 18 units.
+constexpr uintptr_t kRadarRingInsetSites[] = {0x0058A451, 0x0058A487};
+
+// CHud::DrawRadar, corner masks 1 to 4: two `fmul` of 4.0f each, the reach
+// past the left or right edge and past the top or bottom edge.
+constexpr uintptr_t kRadarMaskPadSites[] = {
+    0x0058A7A7, 0x0058A7D7, 0x0058A846, 0x0058A878,
+    0x0058A8F7, 0x0058A92B, 0x0058A9A9, 0x0058A9DF,
+};
+
 // Elements the game positions against the top edge of the radar. They have to
 // follow the radar, otherwise resizing it makes them overlap or drift away.
 

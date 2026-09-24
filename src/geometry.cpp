@@ -58,9 +58,14 @@ bool GetResolution(Resolution& resolution) {
 }
 
 bool IsSupportedExecutable() {
-    return HoldsStockValue(game::kStretchX, kStockStretchX) && HoldsStockValue(game::kStretchY, kStockStretchY) &&
-           HoldsStockValue(game::kRadarLeft, kStockRadarLeft) && HoldsStockValue(game::kRadarTop, kStockRadarTop) &&
-           HoldsStockValue(game::kRadarHigh, kStockRadarHigh) && HoldsStockValue(game::kRadarWide, kStockRadarWide);
+    return HoldsStockValue(game::kStretchX, kStockStretchX) &&
+           HoldsStockValue(game::kStretchY, kStockStretchY) &&
+           HoldsStockValue(game::kRadarLeft, kStockRadarLeft) &&
+           HoldsStockValue(game::kRadarTop, kStockRadarTop) &&
+           HoldsStockValue(game::kRadarHigh, kStockRadarHigh) &&
+           HoldsStockValue(game::kRadarWide, kStockRadarWide) &&
+           HoldsStockValue(game::kRadarRingInset, kStockRadarRingInset) &&
+           HoldsStockValue(game::kRadarMaskPad, kStockRadarMaskPad);
 }
 
 void Update(const config::Settings& settings, const Resolution& resolution) {

@@ -11,6 +11,8 @@ constexpr float kStockRadarLeft = 40.0f;
 constexpr float kStockRadarTop = 104.0f;
 constexpr float kStockRadarHigh = 76.0f;
 constexpr float kStockRadarWide = 94.0f;
+constexpr float kStockRadarRingInset = 18.0f;
+constexpr float kStockRadarMaskPad = 4.0f;
 
 constexpr int32_t kMinScreenSize = 320;
 constexpr int32_t kMaxScreenSize = 32768;
