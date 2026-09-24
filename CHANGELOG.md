@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.1
+
+- Fixed the aircraft horizon and the black radar ring not fitting the map
+  when `diameter` is changed.
+
 ## 1.5.0
 
 - Changed the INI reload to a word typed in game, `ASPECTFIXES` by default;
