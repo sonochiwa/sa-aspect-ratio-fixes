@@ -32,6 +32,12 @@ volatile LONG g_spriteTargeting = 0;
 
 float g_spriteWidthCorrection = 1.0f;
 
+// The angle the camera asked for, before the widescreen conversion. The game
+// derives its draw distances from the FOV as if a wider angle meant a camera
+// pulled back; horizontal-plus keeps the vertical angle of 4:3, so distances
+// are computed from this value to stay as they are at 4:3.
+float g_baseFov = 70.0f;
+
 bool CalcScreenCoorsFor(const Vec3& input, Vec3* output, float* width, float* height, bool checkMax, bool checkMin,
                         volatile LONG* enabled) {
     const bool visible =
@@ -61,6 +67,7 @@ DEFINE_SPRITE_WRAPPER(CalcTargetingSprite, g_spriteTargeting)
 #undef DEFINE_SPRITE_WRAPPER
 
 void __cdecl SetFovHook(float fov) {
+    g_baseFov = fov;
     if (InterlockedCompareExchange(&g_fixFov, 0, 0) != 0) {
         const float aspect = *reinterpret_cast<const float*>(game::kAspectRatio);
         constexpr float kPi = 3.14159265358979323846f;
@@ -109,8 +116,9 @@ void ApplySprites() {
 
 void ApplyFovFix() {
     if (patch::IsReadable(game::kSetFov, 1) && *reinterpret_cast<const uint8_t*>(game::kSetFov) != 0xE9) {
-        hooking::ApplyCallGroup("widescreen FOV", game::kSetFovCallSites, game::kSetFov,
-                                reinterpret_cast<const void*>(SetFovHook));
+        if (hooking::ApplyCallGroup("widescreen FOV", game::kSetFovCallSites, game::kSetFov,
+                                    reinterpret_cast<const void*>(SetFovHook)))
+            hooking::ApplyGroup("FOV draw distance", game::kLodDistanceFovSites, game::kFov, &g_baseFov);
     } else {
         logging::Write("widescreen FOV         SKIPPED, function is hooked");
     }

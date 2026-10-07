@@ -63,6 +63,10 @@ constexpr uintptr_t kSetFovCallSites[] = {
 constexpr uintptr_t kCalculateAspectCallSites[] = {
     0x0053D694, 0x0053D7B1, 0x0053D966, 0x0053E770, 0x0053EB19,
 };
+// CCamera::Process, right after its CDraw::SetFOV call:
+// `fdiv [CDraw::ms_fFOV]` in m_fLODDistMultiplier = 70.0f / ms_fFOV, which
+// also becomes m_fGenerationDistMultiplier for streaming and spawning.
+constexpr uintptr_t kLodDistanceFovSites[] = {0x0052C9DF};
 
 constexpr uintptr_t kSpritePickupSites[] = {0x00455A6A};
 constexpr uintptr_t kSpriteCoronaSites[] = {0x006FB009, 0x006FB24E};

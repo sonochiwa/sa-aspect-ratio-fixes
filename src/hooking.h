@@ -53,11 +53,11 @@ bool ApplyGroup(const char* name, const uintptr_t (&sites)[N], uintptr_t expecte
 // Retargets every E8 call in `sites` that still calls `expected` at
 // `wrapper`. Nothing is written unless all of them do.
 template <size_t N>
-void ApplyCallGroup(const char* name, const uintptr_t (&sites)[N], uintptr_t expected, const void* wrapper) {
+bool ApplyCallGroup(const char* name, const uintptr_t (&sites)[N], uintptr_t expected, const void* wrapper) {
     for (size_t i = 0; i < N; ++i) {
         if (!RelativeCallTargets(sites[i], expected)) {
             logging::Write("%-22s SKIPPED, call %08X was changed", name, static_cast<unsigned>(sites[i]));
-            return;
+            return false;
         }
     }
 
@@ -65,6 +65,7 @@ void ApplyCallGroup(const char* name, const uintptr_t (&sites)[N], uintptr_t exp
     for (size_t i = 0; i < N; ++i)
         applied &= WriteRelativeBranch(sites[i], 0xE8, wrapper);
     logging::Write("%-22s %s (%u calls)", name, applied ? "patched" : "FAILED", static_cast<unsigned>(N));
+    return applied;
 }
 
 } // namespace hooking

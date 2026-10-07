@@ -5,7 +5,8 @@
 // World sprites and the widescreen FOV. The sprite callers of
 // CSprite::CalcScreenCoors are redirected through wrappers that correct the
 // projected width; CDraw::SetFOV and CalculateAspectRatio are redirected so
-// the FOV follows the screen aspect.
+// the FOV follows the screen aspect, and the camera's draw-distance multiplier
+// keeps reading the unconverted FOV.
 namespace world {
 
 void ApplySprites();
