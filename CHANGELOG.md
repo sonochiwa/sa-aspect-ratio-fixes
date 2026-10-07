@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.2
+
+- Fixed `fixFov` shortening the draw distance and the range at which
+  pedestrians and cars appear.
+
 ## 1.5.1
 
 - Fixed the aircraft horizon and the black radar ring not fitting the map
