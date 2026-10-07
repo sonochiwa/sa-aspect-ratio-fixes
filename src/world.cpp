@@ -38,6 +38,15 @@ float g_spriteWidthCorrection = 1.0f;
 // are computed from this value to stay as they are at 4:3.
 float g_baseFov = 70.0f;
 
+// The aim ray is built from that same unconverted angle, so with a widened
+// FOV it ends between the screen centre and the crosshair, low and to the
+// left of where the player aims. The ray's horizontal offset reads this
+// crosshair position, pushed out by the widening, and its vertical offset
+// divides by this aspect instead of the screen's, which together give the
+// offsets of the widened view. Both start at the game's defaults.
+float g_aimCrosshairX = 0.53f;
+float g_aimAspect = 4.0f / 3.0f;
+
 bool CalcScreenCoorsFor(const Vec3& input, Vec3* output, float* width, float* height, bool checkMax, bool checkMin,
                         volatile LONG* enabled) {
     const bool visible =
@@ -68,12 +77,20 @@ DEFINE_SPRITE_WRAPPER(CalcTargetingSprite, g_spriteTargeting)
 
 void __cdecl SetFovHook(float fov) {
     g_baseFov = fov;
-    if (InterlockedCompareExchange(&g_fixFov, 0, 0) != 0) {
-        const float aspect = *reinterpret_cast<const float*>(game::kAspectRatio);
+    const float aspect = *reinterpret_cast<const float*>(game::kAspectRatio);
+
+    // tan(FOV / 2) of the widened view over that of the requested one.
+    float widening = 1.0f;
+    if (InterlockedCompareExchange(&g_fixFov, 0, 0) != 0 && aspect > 0.0f) {
+        widening = aspect / (4.0f / 3.0f);
         constexpr float kPi = 3.14159265358979323846f;
         const float radians = fov * kPi / 180.0f;
-        fov = 2.0f * std::atan(std::tan(radians * 0.5f) * (aspect / (4.0f / 3.0f))) * 180.0f / kPi;
+        fov = 2.0f * std::atan(std::tan(radians * 0.5f) * widening) * 180.0f / kPi;
     }
+
+    const float crosshairX = *reinterpret_cast<const float*>(game::kCrosshairMultX);
+    g_aimCrosshairX = 0.5f + (crosshairX - 0.5f) * widening;
+    g_aimAspect = aspect > 0.0f ? aspect / widening : 4.0f / 3.0f;
     *reinterpret_cast<float*>(game::kFov) = fov;
 }
 
@@ -117,8 +134,12 @@ void ApplySprites() {
 void ApplyFovFix() {
     if (patch::IsReadable(game::kSetFov, 1) && *reinterpret_cast<const uint8_t*>(game::kSetFov) != 0xE9) {
         if (hooking::ApplyCallGroup("widescreen FOV", game::kSetFovCallSites, game::kSetFov,
-                                    reinterpret_cast<const void*>(SetFovHook)))
+                                    reinterpret_cast<const void*>(SetFovHook))) {
             hooking::ApplyGroup("FOV draw distance", game::kLodDistanceFovSites, game::kFov, &g_baseFov);
+            hooking::ApplyGroup("aim crosshair X", game::kAimCrosshairXSites, game::kCrosshairMultX,
+                                &g_aimCrosshairX);
+            hooking::ApplyGroup("aim aspect", game::kAimAspectSites, game::kAspectRatio, &g_aimAspect);
+        }
     } else {
         logging::Write("widescreen FOV         SKIPPED, function is hooked");
     }

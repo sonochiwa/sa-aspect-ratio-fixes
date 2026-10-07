@@ -68,6 +68,21 @@ constexpr uintptr_t kCalculateAspectCallSites[] = {
 // also becomes m_fGenerationDistMultiplier for streaming and spawning.
 constexpr uintptr_t kLodDistanceFovSites[] = {0x0052C9DF};
 
+// CCamera::m_f3rdPersonCHairMultX, the on-foot crosshair's horizontal
+// position as a fraction of the screen width (0.53).
+constexpr uintptr_t kCrosshairMultX = 0x00B6EC14;
+// The aim ray starts from the active CCam's own FOV, which is the angle before
+// the widescreen conversion. Its horizontal offset is
+// tan(FOV / 2) * 2 * (m_f3rdPersonCHairMultX - 0.5): these are the
+// `fld [m_f3rdPersonCHairMultX]` in CCamera::Find3rdPersonCamTargetVector
+// (bullets) and in CCam::Process_AimWeapon (camera turn on entering aim).
+constexpr uintptr_t kAimCrosshairXSites[] = {0x005149A6, 0x005219AE};
+// Its vertical offset is tan(FOV / 2) * 2 * (0.5 - m_f3rdPersonCHairMultY) /
+// CDraw::ms_fAspectRatio: the `fdiv [ms_fAspectRatio]` in
+// CCamera::Find3rdPersonQuickAimPitch (gun pitch),
+// Find3rdPersonCamTargetVector and Process_AimWeapon.
+constexpr uintptr_t kAimAspectSites[] = {0x0050AD79, 0x005149CE, 0x005219DA};
+
 constexpr uintptr_t kSpritePickupSites[] = {0x00455A6A};
 constexpr uintptr_t kSpriteCoronaSites[] = {0x006FB009, 0x006FB24E};
 constexpr uintptr_t kSpriteCoronaReflectionSites[] = {0x006FB868};
