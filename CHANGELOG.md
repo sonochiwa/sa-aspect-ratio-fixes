@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.3
+
+- Fixed bullets landing low and to the left of the crosshair with `fixFov`,
+  most visibly at long range.
+
 ## 1.5.2
 
 - Fixed `fixFov` shortening the draw distance and the range at which
