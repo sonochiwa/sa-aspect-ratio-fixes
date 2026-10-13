@@ -68,6 +68,12 @@ constexpr uintptr_t kCalculateAspectCallSites[] = {
 // also becomes m_fGenerationDistMultiplier for streaming and spawning.
 constexpr uintptr_t kLodDistanceFovSites[] = {0x0052C9DF};
 
+// CClouds::RenderSkyPolys builds the sky across +/- 1.4 times its
+// distance from the camera. Widen its two horizontal axes with the FOV
+// so their edges do not enter the view when driving at high speed.
+constexpr uintptr_t kSkyWidthMultiplier = 0x00859994;
+constexpr uintptr_t kSkyWidthMultiplierSites[] = {0x00714841, 0x0071485E};
+
 // CCamera::m_f3rdPersonCHairMultX, the on-foot crosshair's horizontal
 // position as a fraction of the screen width (0.53).
 constexpr uintptr_t kCrosshairMultX = 0x00B6EC14;

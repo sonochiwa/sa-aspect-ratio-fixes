@@ -38,6 +38,9 @@ float g_spriteWidthCorrection = 1.0f;
 // are computed from this value to stay as they are at 4:3.
 float g_baseFov = 70.0f;
 
+constexpr float kStockSkyWidth = 1.4f;
+float g_skyWidth = kStockSkyWidth;
+
 // The aim ray is built from that same unconverted angle, so with a widened
 // FOV it ends between the screen centre and the crosshair, low and to the
 // left of where the player aims. The ray's horizontal offset reads this
@@ -88,6 +91,11 @@ void __cdecl SetFovHook(float fov) {
         fov = 2.0f * std::atan(std::tan(radians * 0.5f) * widening) * 180.0f / kPi;
     }
 
+    // The sky is world geometry with a fixed horizontal span, rather than
+    // a full-screen overlay. Preserve its original coverage of the view
+    // after the horizontal-plus conversion, including speed-dependent FOV.
+    g_skyWidth = kStockSkyWidth * (widening > 1.0f ? widening : 1.0f);
+
     const float crosshairX = *reinterpret_cast<const float*>(game::kCrosshairMultX);
     g_aimCrosshairX = 0.5f + (crosshairX - 0.5f) * widening;
     g_aimAspect = aspect > 0.0f ? aspect / widening : 4.0f / 3.0f;
@@ -136,6 +144,8 @@ void ApplyFovFix() {
         if (hooking::ApplyCallGroup("widescreen FOV", game::kSetFovCallSites, game::kSetFov,
                                     reinterpret_cast<const void*>(SetFovHook))) {
             hooking::ApplyGroup("FOV draw distance", game::kLodDistanceFovSites, game::kFov, &g_baseFov);
+            hooking::ApplyGroup("FOV sky width", game::kSkyWidthMultiplierSites, game::kSkyWidthMultiplier,
+                                &g_skyWidth);
             hooking::ApplyGroup("aim crosshair X", game::kAimCrosshairXSites, game::kCrosshairMultX,
                                 &g_aimCrosshairX);
             hooking::ApplyGroup("aim aspect", game::kAimAspectSites, game::kAspectRatio, &g_aimAspect);

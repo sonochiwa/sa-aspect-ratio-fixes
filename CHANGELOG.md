@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.4
+
+- Widened the sky polygons with horizontal-plus FOV so their side edges
+  do not appear during high-speed driving on widescreen displays.
+
 ## 1.5.3
 
 - Fixed bullets landing low and to the left of the crosshair with `fixFov`,
