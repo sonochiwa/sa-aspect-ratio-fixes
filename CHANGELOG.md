@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.5
+
+- Fixed the radar's player arrow being larger than the blips around it on
+  widescreen displays.
+- Fixed SA-MP's `/hudscalefix` stretching the round radar and the crosshair.
+- Fixed menu text being cut off on 4:3 screens; `textAspect` and
+  `playerInfoAspect` now apply only to screens wider than them.
+
 ## 1.5.4
 
 - Widened the sky polygons with horizontal-plus FOV so their side edges
