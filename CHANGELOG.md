@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.0
+
+- Fixed a crash when a script that hides the radar, such as the cinematic
+  mode of SAMP Adjustments, shows it again.
+- Fixed `textAspect` narrowing SA-MP textdraws on clients other than
+  0.3.7-R1 and R3-1, which cut their boxes short.
+
 ## 1.5.5
 
 - Fixed the radar's player arrow being larger than the blips around it on
