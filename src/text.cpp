@@ -6,6 +6,7 @@
 #include "log.h"
 #include "patch.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace text {
@@ -113,24 +114,21 @@ void ApplyTextScale(const config::Settings& settings, const Resolution& resoluti
         return;
     }
 
-    void* resume = nullptr;
     if (!hooking::InstallTrampolineHook(game::kFontSetScale, game::kFontSetScalePrologue, kStolen,
                                         game::kFontSetScaleBody, reinterpret_cast<const void*>(FontSetScaleHook),
-                                        &resume)) {
+                                        reinterpret_cast<void**>(&g_setScaleOriginal))) {
         logging::Write("text scale hooks       FAILED (CFont::SetScale entry)");
         return;
     }
-    g_setScaleOriginal = reinterpret_cast<SetScaleFn>(resume);
 
-    void* resumeLang = nullptr;
     if (!hooking::InstallTrampolineHook(game::kFontSetScaleLang, game::kFontSetScaleLangPrologue, kStolenLang,
                                         game::kFontSetScaleLangBody,
-                                        reinterpret_cast<const void*>(FontSetScaleLangHook), &resumeLang)) {
+                                        reinterpret_cast<const void*>(FontSetScaleLangHook),
+                                        reinterpret_cast<void**>(&g_setScaleLangOriginal))) {
         patch::WriteMemory(game::kFontSetScale, game::kFontSetScalePrologue, kStolen);
         logging::Write("text scale hooks       FAILED (CFont::SetScaleLang entry, SetScale restored)");
         return;
     }
-    g_setScaleLangOriginal = reinterpret_cast<SetScaleFn>(resumeLang);
 
     g_textPatched = true;
     UpdateLayout(settings, static_cast<float>(resolution.width), static_cast<float>(resolution.height));
@@ -146,11 +144,16 @@ void ApplyTextScale(const config::Settings& settings, const Resolution& resoluti
 // lands while the render thread is inside a HUD pass or a textdraw print
 // overrides that pass's factor for its remainder; the pass restores the
 // ambient value when it ends, so the effect is confined to that one frame.
+//
+// The aspect only ever narrows text. Menus and boxes are sized for the
+// screen's own proportions, so text proportioned for a wider display than
+// the screen runs past them: a 16:9 setting on a 4:3 screen would cut menu
+// items off.
 void UpdateLayout(const config::Settings& settings, float screenWidth, float screenHeight) {
     const float pixelsPerUnitX = screenWidth / game::kDesignWidth;
     float textPixelsX = pixelsPerUnitX;
     if (g_textPatched && settings.fixText && settings.textAspect > 0.0f)
-        textPixelsX = screenHeight * settings.textAspect / game::kDesignWidth;
+        textPixelsX = std::min(pixelsPerUnitX, screenHeight * settings.textAspect / game::kDesignWidth);
     g_textScale = textPixelsX / pixelsPerUnitX;
     g_textStretchX = g_textScale * kStockStretchX;
     g_fontStretchX = g_textStretchX;

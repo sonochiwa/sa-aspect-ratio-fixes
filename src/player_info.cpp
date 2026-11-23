@@ -6,6 +6,7 @@
 #include "patch.h"
 #include "text.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace player_info {
@@ -89,6 +90,8 @@ void Apply(const config::Settings& settings, const Resolution& resolution) {
                             reinterpret_cast<const void*>(DrawWantedLevelHook));
 }
 
+// The aspect only ever narrows the block, as it does text: laid out for a
+// wider display than the screen, the block would stretch across it.
 void UpdateLayout(const config::Settings& settings, float screenWidth, float screenHeight) {
     float pixelsX = screenWidth / game::kDesignWidth;
     float pixelsY = screenHeight / game::kDesignHeight;
@@ -96,7 +99,7 @@ void UpdateLayout(const config::Settings& settings, float screenWidth, float scr
 
     if (settings.fixPlayerInfo) {
         if (settings.playerInfoAspect > 0.0f)
-            pixelsX = screenHeight * settings.playerInfoAspect / game::kDesignWidth;
+            pixelsX = std::min(pixelsX, screenHeight * settings.playerInfoAspect / game::kDesignWidth);
         if (settings.playerInfoScale > 0) {
             const float scale = static_cast<float>(settings.playerInfoScale) / 100.0f;
             pixelsX *= scale;

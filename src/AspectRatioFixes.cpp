@@ -48,6 +48,7 @@ constexpr DWORD kWatcherPollMs = 50;
 config::Settings g_settings;
 
 void PublishRenderSettings() {
+    radar::PublishSettings(g_settings);
     crosshair::PublishSettings(g_settings);
     hud::PublishSettings(g_settings);
     world::PublishSettings(g_settings);
@@ -132,6 +133,7 @@ DWORD WINAPI PluginThread(LPVOID parameter) {
 
     // Pass-through hooks go in even when their options are off, so a hot
     // reload can enable those options without rewriting code mid-frame.
+    radar::ApplyDrawHook();
     crosshair::ApplyDrawHook();
     hud::ApplyVisibilityHook();
     PublishRenderSettings();

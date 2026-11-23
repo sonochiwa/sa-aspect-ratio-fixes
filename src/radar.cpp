@@ -5,10 +5,15 @@
 #include "hooking.h"
 #include "log.h"
 #include "patch.h"
+#include "stock_stretch.h"
 #include "types.h"
+
+#include <windows.h>
 
 namespace radar {
 namespace {
+
+using DrawRadarFn = void (__cdecl*)();
 
 // Variables the patched instructions read instead of the pooled literals.
 // They are plain floats: x86 aligned 32 bit stores are atomic, so the render
@@ -22,6 +27,19 @@ float g_maskPad = kStockRadarMaskPad;
 float g_stretchX = kStockStretchX;
 float g_blipStretchX = kStockStretchX;
 bool g_patched = false;
+
+// The copied prologue of CHud::DrawRadar followed by a jump back into it.
+DrawRadarFn g_drawRadarOriginal = nullptr;
+
+// The render thread reads this while the worker thread reloads the INI.
+volatile LONG g_keepStockStretch = 0;
+
+// SA-MP calls CHud::DrawRadar through a wrapper of its own, so the entry is
+// the one place both its path and the game's pass through.
+void __cdecl DrawRadarHook() {
+    const stock_stretch::Scope scope(InterlockedCompareExchange(&g_keepStockStretch, 0, 0) != 0);
+    g_drawRadarOriginal();
+}
 
 // The radar geometry only adds up when the horizontal scale, the rectangle
 // and the elements pinned to it are all rewritten together.
@@ -66,6 +84,29 @@ void Apply(const config::Settings& settings) {
     g_patched = applied;
     if (applied && settings.roundRadar)
         RestoreMask();
+}
+
+void ApplyDrawHook() {
+    constexpr size_t kStolen = sizeof(game::kDrawRadarPrologue);
+
+    if (!g_patched) {
+        logging::Write("radar draw hook        SKIPPED, the radar was not patched");
+        return;
+    }
+    if (!hooking::BytesMatch(game::kDrawRadar, game::kDrawRadarPrologue, kStolen)) {
+        logging::Write("radar draw hook        SKIPPED, unexpected prologue");
+        return;
+    }
+
+    const bool applied = hooking::InstallTrampolineHook(
+        game::kDrawRadar, game::kDrawRadarPrologue, kStolen, game::kDrawRadarBody,
+        reinterpret_cast<const void*>(DrawRadarHook), reinterpret_cast<void**>(&g_drawRadarOriginal));
+    logging::Write("radar draw hook        %s (CHud::DrawRadar entry)", applied ? "patched" : "FAILED");
+}
+
+void PublishSettings(const config::Settings& settings) {
+    const bool corrected = g_patched && (settings.roundRadar || settings.roundBlips);
+    InterlockedExchange(&g_keepStockStretch, corrected ? 1 : 0);
 }
 
 void RestoreMask() {

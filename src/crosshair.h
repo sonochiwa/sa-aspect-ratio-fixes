@@ -10,7 +10,7 @@ namespace crosshair {
 // Repoints the reticle, lock-on, scope and viewfinder sites.
 void Apply();
 // Hooks CHud::DrawCrossHairs at its own entry, for the camera crosshair
-// switch and the sniper side fill.
+// switch, the sniper side fill and the stock stretch factors.
 void ApplyDrawHook();
 
 void UpdateGeometry(const config::Settings& settings, float screenWidth, float screenHeight, float squareStretch);

@@ -104,6 +104,11 @@ constexpr uintptr_t kDependentHighSites[] = {
 // stock factor. Blip positions come from the transform in the frame group, so
 // either group can be corrected without the other leaving anything misplaced.
 //
+// The player arrow is the one sprite that was never an oval: CRadar::DrawBlips
+// passes the same SCREEN_STRETCH_X(8) as both its width and its height. It is
+// square, but sized by the screen's width, so on a widescreen display it is
+// larger than every blip around it. The blip group gives it their size.
+//
 // Position conversions that only run while the full-screen map is open are
 // deliberately absent from both groups. They convert map-space X coordinates
 // with the stock SCREEN_STRETCH_X factor so that blips stay attached to the
@@ -125,6 +130,18 @@ constexpr uintptr_t kBlipStretchXSites[] = {
     0x005876D4, 0x0058774B, 0x0058780A, // CRadar::DrawEntityBlip
     0x0058788F, 0x0058792E, 0x00587A1A,
     0x00587AAA,
+    0x005886CC,                         // CRadar::DrawBlips, player arrow
+};
+
+// CHud::DrawRadar draws the map, the blips and everything around the circle.
+// Its first two instructions are `mov eax, [96A7CC]` and `sub esp, 34h`:
+// eight bytes, neither of them position dependent, so they can be copied into
+// a trampoline and re-executed from anywhere.
+constexpr uintptr_t kDrawRadar = 0x0058A330;
+constexpr uintptr_t kDrawRadarBody = 0x0058A338;
+constexpr uint8_t kDrawRadarPrologue[] = {
+    0xA1, 0xCC, 0xA7, 0x96, 0x00, // mov eax, dword ptr ds:[96A7CC]
+    0x83, 0xEC, 0x34,             // sub esp, 34h
 };
 
 // Probe groups. These are candidates rather than mapped elements: they are the

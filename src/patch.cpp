@@ -12,6 +12,24 @@ constexpr DWORD kReadableProtect = PAGE_READONLY | PAGE_READWRITE |
                                    PAGE_EXECUTE_READWRITE |
                                    PAGE_EXECUTE_WRITECOPY;
 
+constexpr DWORD kWritableProtect = PAGE_READWRITE | PAGE_WRITECOPY |
+                                   PAGE_EXECUTE_READWRITE |
+                                   PAGE_EXECUTE_WRITECOPY;
+
+bool HasProtection(uintptr_t address, size_t size, DWORD protect) {
+    MEMORY_BASIC_INFORMATION info = {};
+    const auto* pointer = reinterpret_cast<const void*>(address);
+    if (VirtualQuery(pointer, &info, sizeof(info)) != sizeof(info))
+        return false;
+    if (info.State != MEM_COMMIT || (info.Protect & protect) == 0 ||
+        (info.Protect & PAGE_GUARD) != 0)
+        return false;
+
+    const auto regionEnd =
+        reinterpret_cast<uintptr_t>(info.BaseAddress) + info.RegionSize;
+    return address + size <= regionEnd;
+}
+
 // Offset of the absolute address inside an x87 [disp32] instruction.
 constexpr size_t kOperandOffset = 2;
 
@@ -21,16 +39,11 @@ constexpr size_t kMovEaxOperandOffset = 1;
 }  // namespace
 
 bool IsReadable(uintptr_t address, size_t size) {
-    MEMORY_BASIC_INFORMATION info = {};
-    const auto* pointer = reinterpret_cast<const void*>(address);
-    if (VirtualQuery(pointer, &info, sizeof(info)) != sizeof(info))
-        return false;
-    if (info.State != MEM_COMMIT || (info.Protect & kReadableProtect) == 0)
-        return false;
+    return HasProtection(address, size, kReadableProtect);
+}
 
-    const auto regionEnd =
-        reinterpret_cast<uintptr_t>(info.BaseAddress) + info.RegionSize;
-    return address + size <= regionEnd;
+bool IsWritable(uintptr_t address, size_t size) {
+    return HasProtection(address, size, kWritableProtect);
 }
 
 bool ReadFloat(uintptr_t address, float& value) {

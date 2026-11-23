@@ -11,7 +11,7 @@ the display's actual aspect ratio.
 
 ## Features
 
-- Round radar and radar blips.
+- Round radar and radar blips, with the player arrow at blip size.
 - Round weapon reticle, lock-on marker, sniper scope and camera ring.
 - HUD block (weapon, ammo, bars, money, clock, wanted level) laid out for a
   chosen aspect.
@@ -57,7 +57,7 @@ is missing:
 | `command` | `ASPECTFIXES` | Word that reloads the INI when typed in game. Empty disables it. |
 | `[radar]` | | |
 | `roundRadar` | `1` | Gives the radar frame one scale on both axes, so the circle is round. |
-| `roundBlips` | `1` | Draws blip icons as wide as they are tall. |
+| `roundBlips` | `1` | Draws blip icons as wide as they are tall and the player arrow at their size. |
 | `diameter` | `86` | Radar diameter in HUD units of screen height. Only while `roundRadar=1`. |
 | `marginLeft` | `40` | Radar left margin in the same units. Only while `roundRadar=1`. |
 | `marginBottom` | `28` | Radar bottom margin in the same units. Only while `roundRadar=1`. |
@@ -69,12 +69,12 @@ is missing:
 | `hideSniperHud` | `0` | Hides the HUD while the sniper scope is in use. |
 | `[hud]` | | |
 | `fixPlayerInfo` | `1` | Lays the weapon icon, ammo, bars, money, clock and wanted level out as one block. |
-| `playerInfoAspect` | `16:9` | The display aspect the block is laid out for, as `16:9` or `1.7778`. `0` keeps the screen's own. |
+| `playerInfoAspect` | `16:9` | The display aspect the block is laid out for, as `16:9` or `1.7778`. Screens not wider than it are left alone. `0` keeps the screen's own. |
 | `playerInfoScale` | `0` | Size of the block in percent, about its top right corner. `0` keeps the game's own. |
 | `playerInfoMarginRight` | `0` | The money's right margin in HUD units of screen height. `0` keeps the game's 32. |
 | `[text]` | | |
 | `fixText` | `1` | Proportions every other piece of text the font draws for `textAspect`. |
-| `textAspect` | `16:9` | The display aspect the text is proportioned for. `0` keeps the screen's own. |
+| `textAspect` | `16:9` | The display aspect the text is proportioned for. Screens not wider than it are left alone. `0` keeps the screen's own. |
 | `[widescreen]` | | |
 | `useScreenAspect` | `0` | Sets the game's aspect ratio to the screen's own instead of 4:3. |
 | `fixFov` | `1` | Converts the FOV for that aspect. Does nothing while `useScreenAspect=0`. |
@@ -92,7 +92,12 @@ closed; a message confirms the reload. The radar layout applies only while
 `roundRadar=1`, and `fixFov` only while `useScreenAspect=1`. The aspect keys
 name the display an element was designed for: `16:9` keeps the familiar look
 on an ultrawide screen, `4:3` gives the original proportions, `0` uses the
-screen's own.
+screen's own. They only ever narrow an element, so a 4:3 screen keeps the
+game's own menus and HUD under the `16:9` defaults.
+
+SA-MP's `/hudscalefix` has no effect on the radar while `roundRadar` or
+`roundBlips` is on, nor on the crosshair while `roundCrosshair` or `roundScope`
+is on; the plugin draws them at the size it is configured for.
 
 ## Release Integrity
 

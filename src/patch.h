@@ -7,6 +7,8 @@ namespace patch {
 
 // True when the whole range is committed and readable.
 bool IsReadable(uintptr_t address, size_t size);
+// True when the whole range is committed and can be written as it is.
+bool IsWritable(uintptr_t address, size_t size);
 
 // Reads a float or an int32 from the game, returning false when the address is
 // not mapped yet.

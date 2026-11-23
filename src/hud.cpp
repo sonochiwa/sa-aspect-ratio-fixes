@@ -102,11 +102,9 @@ void ApplyVisibilityHook() {
         return;
     }
 
-    void* resume = nullptr;
-    const bool applied =
-        hooking::InstallTrampolineHook(game::kDrawHudBody, game::kDrawHudBodyPrologue, kBodyStolen,
-                                       game::kDrawHudBodyResume, reinterpret_cast<const void*>(DrawHudHook), &resume);
-    g_drawHudResume = reinterpret_cast<DrawHudFn>(resume);
+    const bool applied = hooking::InstallTrampolineHook(
+        game::kDrawHudBody, game::kDrawHudBodyPrologue, kBodyStolen, game::kDrawHudBodyResume,
+        reinterpret_cast<const void*>(DrawHudHook), reinterpret_cast<void**>(&g_drawHudResume));
     logging::Write("aim-mode HUD hook      %s (CHud::Draw body, entry is owned by another plugin)",
                    applied ? "patched" : "FAILED");
 }

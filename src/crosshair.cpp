@@ -5,6 +5,7 @@
 #include "hooking.h"
 #include "log.h"
 #include "patch.h"
+#include "stock_stretch.h"
 #include "types.h"
 
 #include <windows.h>
@@ -39,6 +40,7 @@ bool g_viewfinderPatched = false;
 // The render thread reads these while the worker thread reloads the INI.
 volatile LONG g_noCameraCrosshair = 0;
 volatile LONG g_drawSniperFill = 0;
+volatile LONG g_keepStockStretch = 0;
 
 // The copied prologue of CHud::DrawCrossHairs followed by a jump back into
 // it. Calling this runs the original function without going through its
@@ -77,6 +79,7 @@ void DrawCrossHairsHook() {
         InterlockedCompareExchange(&g_noCameraCrosshair, 0, 0) != 0)
         return;
 
+    const stock_stretch::Scope scope(InterlockedCompareExchange(&g_keepStockStretch, 0, 0) != 0);
     g_drawCrossHairsOriginal();
 
     if (InterlockedCompareExchange(&g_drawSniperFill, 0, 0) != 0)
@@ -114,11 +117,9 @@ void ApplyDrawHook() {
         return;
     }
 
-    void* resume = nullptr;
-    const bool applied = hooking::InstallTrampolineHook(game::kDrawCrossHairs, game::kDrawCrossHairsPrologue, kStolen,
-                                                        game::kDrawCrossHairsBody,
-                                                        reinterpret_cast<const void*>(DrawCrossHairsHook), &resume);
-    g_drawCrossHairsOriginal = reinterpret_cast<DrawCrossHairsFn>(resume);
+    const bool applied = hooking::InstallTrampolineHook(
+        game::kDrawCrossHairs, game::kDrawCrossHairsPrologue, kStolen, game::kDrawCrossHairsBody,
+        reinterpret_cast<const void*>(DrawCrossHairsHook), reinterpret_cast<void**>(&g_drawCrossHairsOriginal));
     logging::Write("crosshair draw hook    %s (CHud::DrawCrossHairs entry)", applied ? "patched" : "FAILED");
 }
 
@@ -149,6 +150,7 @@ void UpdateGeometry(const config::Settings& settings, float screenWidth, float s
 void PublishSettings(const config::Settings& settings) {
     InterlockedExchange(&g_noCameraCrosshair, settings.noCameraCrosshair ? 1 : 0);
     InterlockedExchange(&g_drawSniperFill, settings.roundScope ? 1 : 0);
+    InterlockedExchange(&g_keepStockStretch, settings.roundCrosshair || settings.roundScope ? 1 : 0);
 }
 
 } // namespace crosshair

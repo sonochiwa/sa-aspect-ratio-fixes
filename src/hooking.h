@@ -21,7 +21,9 @@ bool RelativeCallTargets(uintptr_t site, uintptr_t expected);
 
 // Installs a trampoline for `stolen` bytes at `address` and points `resume`
 // at it. The caller has already established that those bytes are whole
-// instructions and that none of them is position dependent.
+// instructions and that none of them is position dependent. `resume` is
+// written before the branch, so it has to be the very variable the hook calls
+// through: a frame can reach the hook as soon as the branch is in.
 bool InstallTrampolineHook(uintptr_t address, const uint8_t* expected, size_t stolen, uintptr_t resumeAt,
                            const void* hook, void** resume);
 
