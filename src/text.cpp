@@ -5,9 +5,13 @@
 #include "hooking.h"
 #include "log.h"
 #include "patch.h"
+#include "textdraws.h"
 
 #include <algorithm>
 #include <cmath>
+#include <intrin.h>
+
+#pragma intrinsic(_ReturnAddress)
 
 namespace text {
 namespace {
@@ -32,21 +36,31 @@ bool g_textPatched = false;
 SetScaleFn g_setScaleOriginal = nullptr;
 SetScaleFn g_setScaleLangOriginal = nullptr;
 
+// Where samp.dll is mapped. Its CFont text is the textdraws, which the
+// server lays out against boxes and sprites the text module never scales;
+// narrower glyphs wrap onto fewer lines and shrink the boxes they fill. The
+// textdraw draw hook only exists for mapped builds, so the caller's address
+// is what keeps the rest of them out.
+uintptr_t g_sampBegin = 0;
+uintptr_t g_sampEnd = 0;
+
 // The ratio is 1.0 while the module is off or not in, so there is no switch
 // to publish separately from it: glyphs and outline read values that one
 // function writes together.
-float ScaledTextWidth(float width) {
-    if (!g_textdrawDrawing && !g_hudPassDrawing)
+float ScaledTextWidth(float width, const void* caller) {
+    const auto address = reinterpret_cast<uintptr_t>(caller);
+    const bool fromSamp = address >= g_sampBegin && address < g_sampEnd;
+    if (!g_textdrawDrawing && !g_hudPassDrawing && !fromSamp)
         width *= g_textScale;
     return width;
 }
 
 void __cdecl FontSetScaleHook(float width, float height) {
-    g_setScaleOriginal(ScaledTextWidth(width), height);
+    g_setScaleOriginal(ScaledTextWidth(width, _ReturnAddress()), height);
 }
 
 void __cdecl FontSetScaleLangHook(float width, float height) {
-    g_setScaleLangOriginal(ScaledTextWidth(width), height);
+    g_setScaleLangOriginal(ScaledTextWidth(width, _ReturnAddress()), height);
 }
 
 // Runs in place of the GetTextRect call inside CFont::PrintString. The rect
@@ -113,6 +127,8 @@ void ApplyTextScale(const config::Settings& settings, const Resolution& resoluti
         logging::Write("text scale hooks       SKIPPED, unexpected prologue");
         return;
     }
+
+    textdraws::GetSampImage(g_sampBegin, g_sampEnd);
 
     if (!hooking::InstallTrampolineHook(game::kFontSetScale, game::kFontSetScalePrologue, kStolen,
                                         game::kFontSetScaleBody, reinterpret_cast<const void*>(FontSetScaleHook),

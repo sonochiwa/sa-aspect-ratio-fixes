@@ -12,6 +12,10 @@ namespace textdraws {
 void ApplySampTextdraws(const config::Settings& settings, const Resolution& resolution);
 bool Patched();
 
+// Where samp.dll is mapped, as [begin, end), whatever its build. Both are
+// zero when it is not loaded.
+void GetSampImage(uintptr_t& begin, uintptr_t& end);
+
 // Lays the textdraws out in a centred area of the configured aspect when the
 // screen is wider than that, and leaves them at the screen's own width
 // otherwise.

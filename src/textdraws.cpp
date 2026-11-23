@@ -121,22 +121,25 @@ void __cdecl TextDrawPrintStringHook(float x, float y, const char* string) {
     text::EndTextdrawPrint();
 }
 
-// The client is identified by its PE link timestamp rather than by a version
-// resource, because every 0.3.7 build reports 0.3.7 there.
-uint32_t ModuleTimeDateStamp(uintptr_t base) {
+const IMAGE_NT_HEADERS32* ModuleHeaders(uintptr_t base) {
     if (!patch::IsReadable(base, sizeof(IMAGE_DOS_HEADER)))
-        return 0;
+        return nullptr;
     const auto* dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(base);
     if (dos->e_magic != IMAGE_DOS_SIGNATURE || dos->e_lfanew <= 0)
-        return 0;
+        return nullptr;
 
     const uintptr_t headers = base + static_cast<uintptr_t>(dos->e_lfanew);
     if (!patch::IsReadable(headers, sizeof(IMAGE_NT_HEADERS32)))
-        return 0;
+        return nullptr;
     const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS32*>(headers);
-    if (nt->Signature != IMAGE_NT_SIGNATURE)
-        return 0;
-    return nt->FileHeader.TimeDateStamp;
+    return nt->Signature == IMAGE_NT_SIGNATURE ? nt : nullptr;
+}
+
+// The client is identified by its PE link timestamp rather than by a version
+// resource, because every 0.3.7 build reports 0.3.7 there.
+uint32_t ModuleTimeDateStamp(uintptr_t base) {
+    const IMAGE_NT_HEADERS32* nt = ModuleHeaders(base);
+    return nt ? nt->FileHeader.TimeDateStamp : 0;
 }
 
 } // namespace
@@ -230,6 +233,21 @@ void ApplySampTextdraws(const config::Settings& settings, const Resolution& reso
 
 bool Patched() {
     return g_patched;
+}
+
+void GetSampImage(uintptr_t& begin, uintptr_t& end) {
+    begin = 0;
+    end = 0;
+    const HMODULE module = GetModuleHandleA("samp.dll");
+    if (!module)
+        return;
+
+    const auto base = reinterpret_cast<uintptr_t>(module);
+    const IMAGE_NT_HEADERS32* nt = ModuleHeaders(base);
+    if (!nt)
+        return;
+    begin = base;
+    end = base + nt->OptionalHeader.SizeOfImage;
 }
 
 // A 16:9 screen is not wider than 16:9, so the plugin changes nothing there;

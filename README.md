@@ -73,7 +73,7 @@ is missing:
 | `playerInfoScale` | `0` | Size of the block in percent, about its top right corner. `0` keeps the game's own. |
 | `playerInfoMarginRight` | `0` | The money's right margin in HUD units of screen height. `0` keeps the game's 32. |
 | `[text]` | | |
-| `fixText` | `1` | Proportions every other piece of text the font draws for `textAspect`. |
+| `fixText` | `1` | Proportions the game's text, apart from the HUD block and SA-MP textdraws, for `textAspect`. |
 | `textAspect` | `16:9` | The display aspect the text is proportioned for. Screens not wider than it are left alone. `0` keeps the screen's own. |
 | `[widescreen]` | | |
 | `useScreenAspect` | `0` | Sets the game's aspect ratio to the screen's own instead of 4:3. |
