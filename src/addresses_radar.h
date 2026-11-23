@@ -134,14 +134,17 @@ constexpr uintptr_t kBlipStretchXSites[] = {
 };
 
 // CHud::DrawRadar draws the map, the blips and everything around the circle.
-// Its first two instructions are `mov eax, [96A7CC]` and `sub esp, 34h`:
-// eight bytes, neither of them position dependent, so they can be copied into
-// a trampoline and re-executed from anywhere.
+// Scripts that hide the radar write a RET over its first byte and put 0xA1
+// back to show it again, so the first instruction is kept and the branch goes
+// over the two after it. All three are position independent and leave the
+// stack alone, so the trampoline runs them again from anywhere.
 constexpr uintptr_t kDrawRadar = 0x0058A330;
-constexpr uintptr_t kDrawRadarBody = 0x0058A338;
+constexpr uintptr_t kDrawRadarBody = 0x0058A33B;
+constexpr size_t kDrawRadarKept = 5;
 constexpr uint8_t kDrawRadarPrologue[] = {
     0xA1, 0xCC, 0xA7, 0x96, 0x00, // mov eax, dword ptr ds:[96A7CC]
     0x83, 0xEC, 0x34,             // sub esp, 34h
+    0x83, 0xF8, 0x01,             // cmp eax, 1
 };
 
 // Probe groups. These are candidates rather than mapped elements: they are the

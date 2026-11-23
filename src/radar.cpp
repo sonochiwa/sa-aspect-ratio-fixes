@@ -34,8 +34,8 @@ DrawRadarFn g_drawRadarOriginal = nullptr;
 // The render thread reads this while the worker thread reloads the INI.
 volatile LONG g_keepStockStretch = 0;
 
-// SA-MP calls CHud::DrawRadar through a wrapper of its own, so the entry is
-// the one place both its path and the game's pass through.
+// SA-MP calls CHud::DrawRadar through a wrapper of its own, so the function
+// itself is the one place both its path and the game's pass through.
 void __cdecl DrawRadarHook() {
     const stock_stretch::Scope scope(InterlockedCompareExchange(&g_keepStockStretch, 0, 0) != 0);
     g_drawRadarOriginal();
@@ -99,9 +99,9 @@ void ApplyDrawHook() {
     }
 
     const bool applied = hooking::InstallTrampolineHook(
-        game::kDrawRadar, game::kDrawRadarPrologue, kStolen, game::kDrawRadarBody,
+        game::kDrawRadar, game::kDrawRadarPrologue, kStolen, game::kDrawRadarKept, game::kDrawRadarBody,
         reinterpret_cast<const void*>(DrawRadarHook), reinterpret_cast<void**>(&g_drawRadarOriginal));
-    logging::Write("radar draw hook        %s (CHud::DrawRadar entry)", applied ? "patched" : "FAILED");
+    logging::Write("radar draw hook        %s (CHud::DrawRadar, after its first instruction)", applied ? "patched" : "FAILED");
 }
 
 void PublishSettings(const config::Settings& settings) {

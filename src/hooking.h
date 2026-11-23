@@ -27,6 +27,15 @@ bool RelativeCallTargets(uintptr_t site, uintptr_t expected);
 bool InstallTrampolineHook(uintptr_t address, const uint8_t* expected, size_t stolen, uintptr_t resumeAt,
                            const void* hook, void** resume);
 
+// The same for `size` bytes at `address`, except that the first `kept` of
+// them stay in place and the branch is written after them. The trampoline
+// runs all `size` bytes, so the kept ones run twice: they must leave the
+// stack as it was at the entry and do nothing a second run would change.
+// A modification that turns the function off and on by rewriting its first
+// byte then never lands on the branch.
+bool InstallTrampolineHook(uintptr_t address, const uint8_t* expected, size_t size, size_t kept, uintptr_t resumeAt,
+                           const void* hook, void** resume);
+
 // Where the 32 bit operand starts inside the instructions the plugin
 // rewrites: two bytes into an x87 instruction with an absolute address, one
 // byte into `mov eax, [disp32]` and into a relative call.

@@ -64,18 +64,29 @@ bool RelativeCallTargets(uintptr_t site, uintptr_t expected) {
 
 bool InstallTrampolineHook(uintptr_t address, const uint8_t* expected, size_t stolen, uintptr_t resumeAt,
                            const void* hook, void** resume) {
+    return InstallTrampolineHook(address, expected, stolen, 0, resumeAt, hook, resume);
+}
+
+bool InstallTrampolineHook(uintptr_t address, const uint8_t* expected, size_t size, size_t kept, uintptr_t resumeAt,
+                           const void* hook, void** resume) {
+    uint8_t branch[16];
+    const uintptr_t site = address + kept;
+    const size_t stolen = size - kept;
+    if (kept > size || stolen < kCallLength || stolen > sizeof(branch))
+        return false;
+
     auto* trampoline = static_cast<uint8_t*>(
-        VirtualAlloc(nullptr, stolen + 5, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
+        VirtualAlloc(nullptr, size + kCallLength, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE));
     if (!trampoline)
         return false;
 
-    std::memcpy(trampoline, expected, stolen);
-    trampoline[stolen] = 0xE9;
+    std::memcpy(trampoline, expected, size);
+    trampoline[size] = 0xE9;
     const auto backwards = static_cast<int32_t>(static_cast<intptr_t>(resumeAt) -
-                                                reinterpret_cast<intptr_t>(trampoline + stolen + 5));
-    std::memcpy(trampoline + stolen + 1, &backwards, sizeof(backwards));
+                                                reinterpret_cast<intptr_t>(trampoline + size + kCallLength));
+    std::memcpy(trampoline + size + 1, &backwards, sizeof(backwards));
 
-    const intptr_t displacement = reinterpret_cast<intptr_t>(hook) - static_cast<intptr_t>(address + 5);
+    const intptr_t displacement = reinterpret_cast<intptr_t>(hook) - static_cast<intptr_t>(site + kCallLength);
     if (displacement < INT32_MIN || displacement > INT32_MAX) {
         VirtualFree(trampoline, 0, MEM_RELEASE);
         return false;
@@ -85,13 +96,12 @@ bool InstallTrampolineHook(uintptr_t address, const uint8_t* expected, size_t st
     // calls through a null pointer.
     *resume = trampoline;
 
-    uint8_t branch[16];
     std::memset(branch, 0x90, stolen);
     branch[0] = 0xE9;
     const auto relative = static_cast<int32_t>(displacement);
     std::memcpy(branch + 1, &relative, sizeof(relative));
 
-    if (patch::WriteMemory(address, branch, stolen))
+    if (patch::WriteMemory(site, branch, stolen))
         return true;
 
     *resume = nullptr;

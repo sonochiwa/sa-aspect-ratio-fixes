@@ -18,7 +18,7 @@ void Apply(const config::Settings& settings);
 // mask back.
 void RestoreMask();
 
-// Hooks CHud::DrawRadar at its own entry, so the radar draws against the
+// Hooks CHud::DrawRadar at its start, so the radar draws against the
 // stock stretch factors while a correction is on. Needs Apply to have
 // succeeded first.
 void ApplyDrawHook();
